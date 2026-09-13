@@ -16,9 +16,17 @@ export const Location3DCanvas: React.FC = () => {
     camera.position.set(0, 2.5, 6.5);
     camera.lookAt(0, 0, 0);
 
-    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, powerPreference: 'high-performance' });
+    renderer.setClearColor(0x000000, 0);
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.domElement.style.background = 'transparent';
+    renderer.domElement.style.display = 'block';
+
+    const onContextLost = (e: Event) => e.preventDefault();
+    renderer.domElement.addEventListener('webglcontextlost', onContextLost, false);
+
+    container.innerHTML = '';
     container.appendChild(renderer.domElement);
 
     const venueGroup = new THREE.Group();
@@ -153,11 +161,21 @@ export const Location3DCanvas: React.FC = () => {
     });
     resizeObserver.observe(container);
 
+    let isVisible = true;
+    const intersectionObserver = new IntersectionObserver(
+      ([entry]) => {
+        isVisible = entry ? entry.isIntersecting : true;
+      },
+      { threshold: 0.05 }
+    );
+    intersectionObserver.observe(container);
+
     let animId: number;
     let clock = new THREE.Clock();
 
     const animate = () => {
       animId = requestAnimationFrame(animate);
+      if (!isVisible) return;
       const elapsed = clock.getElapsedTime();
 
       if (!isDragging) {
@@ -181,6 +199,7 @@ export const Location3DCanvas: React.FC = () => {
     return () => {
       cancelAnimationFrame(animId);
       resizeObserver.disconnect();
+      intersectionObserver.disconnect();
       container.removeEventListener('mousedown', onPointerDown);
       window.removeEventListener('mousemove', onPointerMove);
       window.removeEventListener('mouseup', onPointerUp);

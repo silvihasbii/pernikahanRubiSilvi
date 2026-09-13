@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Volume2, VolumeX, Heart, Calendar, Image as ImageIcon, MessageSquareHeart, Home } from 'lucide-react';
+import { Volume2, VolumeX, Heart, Calendar, Image as ImageIcon, MessageSquareHeart, Home, Film } from 'lucide-react';
 import { weddingAudio } from '../utils/audioPlayer';
 
 interface NavbarProps {
   activeSection: string;
+  hasVideo?: boolean;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ activeSection }) => {
+export const Navbar: React.FC<NavbarProps> = ({ activeSection, hasVideo }) => {
   const [isPlaying, setIsPlaying] = useState(weddingAudio.getIsPlaying());
 
   useEffect(() => {
@@ -17,6 +18,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activeSection }) => {
   const navItems = [
     { id: 'hero', label: 'Beranda', icon: Home },
     { id: 'couple', label: 'Mempelai', icon: Heart },
+    ...(hasVideo ? [{ id: 'video', label: 'Video', icon: Film }] : []),
     { id: 'event', label: 'Acara', icon: Calendar },
     { id: 'gallery', label: 'Galeri', icon: ImageIcon },
     { id: 'rsvp', label: 'RSVP', icon: MessageSquareHeart },

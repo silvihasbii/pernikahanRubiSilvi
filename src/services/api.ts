@@ -67,6 +67,31 @@ const DEFAULT_CONFIG: WeddingConfig = {
       description: 'Kini langkah kami bermuara pada janji suci pernikahan. Dengan ridho keluarga dan doa sahabat, kami memulai babak terindah dalam hidup.',
     },
   ],
+  wa_template: `Kepada Yth.
+Bapak/Ibu/Saudara/i
+*{guest}*
+___
+
+Tanpa mengurangi rasa hormat, perkenankan kami mengundang Bapak/Ibu/Saudara/i untuk menghadiri acara pernikahan kami:
+
+*{groom} & {bride}*
+
+📅 Tanggal: {date}
+📍 Lokasi: {location}
+
+Untuk informasi detail acara, rute lokasi, serta konfirmasi kehadiran (RSVP), silakan kunjungi tautan undangan digital kami melalui link berikut:
+
+{link}
+
+Merupakan suatu kehormatan dan kebahagiaan bagi kami apabila Bapak/Ibu/Saudara/i berkenan hadir dan memberikan doa restu bagi kami berdua.
+
+Atas kehadiran dan doa restunya, kami ucapkan terima kasih.
+
+Salam hangat,
+*{groom} & {bride}*`,
+  video_url: '',
+  video_title: 'Kisah Cinta & Momen Bahagia Kami',
+  video_description: 'Cuplikan perjalanan cinta kami menuju pelaminan suci.',
 };
 
 const DEFAULT_GALLERY: GalleryPhoto[] = [

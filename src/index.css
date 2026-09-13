@@ -4,11 +4,24 @@
   html {
     scroll-behavior: smooth;
     font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    background-color: #07080b;
+    color-scheme: dark;
   }
 
   body {
-    background-color: #0b0c10;
+    background-color: #07080b;
     color: #e5e5e5;
+    color-scheme: dark;
+    min-height: 100vh;
+  }
+
+  #root {
+    background-color: #07080b;
+  }
+
+  canvas {
+    background-color: transparent !important;
+    touch-action: pan-y;
   }
 }
 

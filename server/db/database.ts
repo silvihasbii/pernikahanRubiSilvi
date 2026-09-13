@@ -114,6 +114,10 @@ async function initSchema(db: Database) {
   addColumnIfNotExists('wedding_config', 'gift_receiver', 'TEXT');
   addColumnIfNotExists('wedding_config', 'gift_phone', 'TEXT');
   addColumnIfNotExists('wedding_config', 'love_story_json', 'TEXT');
+  addColumnIfNotExists('wedding_config', 'wa_template', 'TEXT');
+  addColumnIfNotExists('wedding_config', 'video_url', 'TEXT');
+  addColumnIfNotExists('wedding_config', 'video_title', 'TEXT');
+  addColumnIfNotExists('wedding_config', 'video_description', 'TEXT');
 
   // Create RSVP table
   db.run(`
@@ -258,9 +262,31 @@ async function initSchema(db: Database) {
         gift_address = COALESCE(gift_address, 'Jl. Sunset Boulevard No. 88, Menteng, Jakarta Pusat 10310'),
         gift_receiver = COALESCE(gift_receiver, 'Dimas & Althea'),
         gift_phone = COALESCE(gift_phone, '0812-3456-7890'),
-        love_story_json = COALESCE(love_story_json, ?)
+        love_story_json = COALESCE(love_story_json, ?),
+        wa_template = COALESCE(wa_template, ?)
       WHERE id = 'default_config'
-    `, [defaultLoveStory]);
+    `, [defaultLoveStory, `Kepada Yth.
+Bapak/Ibu/Saudara/i
+*{guest}*
+___
+
+Tanpa mengurangi rasa hormat, perkenankan kami mengundang Bapak/Ibu/Saudara/i untuk menghadiri acara pernikahan kami:
+
+*{groom} & {bride}*
+
+📅 Tanggal: {date}
+📍 Lokasi: {location}
+
+Untuk informasi detail acara, rute lokasi, serta konfirmasi kehadiran (RSVP), silakan kunjungi tautan undangan digital kami melalui link berikut:
+
+{link}
+
+Merupakan suatu kehormatan dan kebahagiaan bagi kami apabila Bapak/Ibu/Saudara/i berkenan hadir dan memberikan doa restu bagi kami berdua.
+
+Atas kehadiran dan doa restunya, kami ucapkan terima kasih.
+
+Salam hangat,
+*{groom} & {bride}*`]);
   }
 
   // Seed default wishes if empty

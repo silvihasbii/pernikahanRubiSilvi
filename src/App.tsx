@@ -5,6 +5,7 @@ import { HeroSection } from './components/HeroSection';
 import { CountdownSection } from './components/CountdownSection';
 import { CoupleSection } from './components/CoupleSection';
 import { StorySection } from './components/StorySection';
+import { VideoSection } from './components/VideoSection';
 import { EventSection } from './components/EventSection';
 import { GallerySection } from './components/GallerySection';
 import { RsvpSection } from './components/RsvpSection';
@@ -135,7 +136,14 @@ export default function App() {
   useEffect(() => {
     if (!isOpened) return;
 
-    const sections = ['hero', 'couple', 'event', 'gallery', 'rsvp'];
+    const sections = [
+      'hero',
+      'couple',
+      ...(config?.video_url && config.video_url.trim() ? ['video'] : []),
+      'event',
+      'gallery',
+      'rsvp',
+    ];
     const handleScroll = () => {
       const scrollPos = window.scrollY + 250;
       for (const id of sections) {
@@ -202,7 +210,10 @@ export default function App() {
       {isOpened && (
         <>
           {/* Sticky Non-Disappearing Navbar */}
-          <Navbar activeSection={activeSection} />
+          <Navbar
+            activeSection={activeSection}
+            hasVideo={Boolean(config?.video_url && config.video_url.trim())}
+          />
 
           {/* 3D Wedding Hero Section */}
           <HeroSection config={config} guestName={guestName} />
@@ -215,6 +226,9 @@ export default function App() {
 
           {/* Love Story Timeline Section */}
           <StorySection config={config} />
+
+          {/* Video Pre-Wedding & Cinematic Section */}
+          <VideoSection config={config} />
 
           {/* 3D Pavilion & Event Schedule Section */}
           <EventSection config={config} />

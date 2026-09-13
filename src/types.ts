@@ -40,6 +40,10 @@ export interface WeddingConfig {
   gift_receiver?: string;
   gift_phone?: string;
   love_story?: LoveStoryMilestone[];
+  wa_template?: string;
+  video_url?: string;
+  video_title?: string;
+  video_description?: string;
   updated_at?: string;
 }
 

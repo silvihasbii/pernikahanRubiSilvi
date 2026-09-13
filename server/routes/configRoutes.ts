@@ -43,7 +43,8 @@ router.put('/', requireAdminAuth, async (req, res) => {
     wedding_date, akad_time, akad_location, akad_address, akad_map_url,
     resepsi_time, resepsi_location, resepsi_address, resepsi_map_url,
     quote, quote_source, audio_url, bank_accounts,
-    gift_address, gift_receiver, gift_phone, love_story
+    gift_address, gift_receiver, gift_phone, love_story,
+    wa_template, video_url, video_title, video_description
   } = req.body;
 
   try {
@@ -82,6 +83,10 @@ router.put('/', requireAdminAuth, async (req, res) => {
         gift_receiver = COALESCE(?, gift_receiver),
         gift_phone = COALESCE(?, gift_phone),
         love_story_json = ?,
+        wa_template = COALESCE(?, wa_template),
+        video_url = ?,
+        video_title = ?,
+        video_description = ?,
         updated_at = ?
       WHERE id = 'default_config'
     `, [
@@ -91,7 +96,8 @@ router.put('/', requireAdminAuth, async (req, res) => {
       wedding_date, akad_time, akad_location, akad_address, akad_map_url,
       resepsi_time, resepsi_location, resepsi_address, resepsi_map_url,
       quote, quote_source, audio_url, bankAccountsJson,
-      gift_address, gift_receiver, gift_phone, loveStoryJson, now
+      gift_address, gift_receiver, gift_phone, loveStoryJson,
+      wa_template, video_url ?? '', video_title ?? '', video_description ?? '', now
     ]);
 
     saveDatabase();

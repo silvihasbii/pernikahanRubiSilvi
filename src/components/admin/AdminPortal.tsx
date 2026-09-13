@@ -26,6 +26,7 @@ import {
   Package,
   Heart,
   Sparkles,
+  Film,
 } from 'lucide-react';
 import {
   adminLogin,
@@ -43,6 +44,29 @@ import {
   updateWeddingConfig,
 } from '../../services/api';
 import { AdminStats, AdminUser, GalleryPhoto, RsvpItem, WeddingConfig, WishItem, BankAccount, LoveStoryMilestone } from '../../types';
+
+export const DEFAULT_WA_TEMPLATE = `Kepada Yth.
+Bapak/Ibu/Saudara/i
+*{guest}*
+___
+
+Tanpa mengurangi rasa hormat, perkenankan kami mengundang Bapak/Ibu/Saudara/i untuk menghadiri acara pernikahan kami:
+
+*{groom} & {bride}*
+
+📅 Tanggal: {date}
+📍 Lokasi: {location}
+
+Untuk informasi detail acara, rute lokasi, serta konfirmasi kehadiran (RSVP), silakan kunjungi tautan undangan digital kami melalui link berikut:
+
+{link}
+
+Merupakan suatu kehormatan dan kebahagiaan bagi kami apabila Bapak/Ibu/Saudara/i berkenan hadir dan memberikan doa restu bagi kami berdua.
+
+Atas kehadiran dan doa restunya, kami ucapkan terima kasih.
+
+Salam hangat,
+*{groom} & {bride}*`;
 
 interface AdminPortalProps {
   config: WeddingConfig | null;
@@ -101,6 +125,26 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   // Invite link generator state
   const [guestNameInput, setGuestNameInput] = useState('');
   const [copiedLink, setCopiedLink] = useState(false);
+  const [copiedWaMessage, setCopiedWaMessage] = useState(false);
+  const [waTemplateSaving, setWaTemplateSaving] = useState(false);
+  const [waTemplateSuccess, setWaTemplateSuccess] = useState('');
+
+  // Manual Date Input state (for direct keyboard editing)
+  const [manualDateInput, setManualDateInput] = useState('');
+
+  // Synchronize manualDateInput with configForm.wedding_date
+  useEffect(() => {
+    if (configForm.wedding_date) {
+      try {
+        const d = new Date(configForm.wedding_date);
+        if (!isNaN(d.getTime())) {
+          const pad = (n: number) => String(n).padStart(2, '0');
+          const formatted = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+          setManualDateInput(formatted);
+        }
+      } catch {}
+    }
+  }, [configForm.wedding_date]);
 
   // Check existing token
   useEffect(() => {
@@ -338,6 +382,90 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     setConfigForm({ ...configForm, love_story: current });
   };
 
+  // Direct Manual Date typing handler
+  const handleManualDateType = (val: string) => {
+    setManualDateInput(val);
+    const trimmed = val.trim();
+    // Normalize space or T separator (e.g., "2026-10-18 09:00" -> "2026-10-18T09:00")
+    const normalized = trimmed.includes(' ') ? trimmed.replace(' ', 'T') : trimmed;
+    const parsed = new Date(normalized);
+    if (!isNaN(parsed.getTime()) && parsed.getFullYear() >= 2000 && parsed.getFullYear() <= 2100) {
+      setConfigForm((prev) => ({ ...prev, wedding_date: parsed.toISOString() }));
+    }
+  };
+
+  // Quick Date Picker handler
+  const handleDatePickerChange = (dateVal: string) => {
+    if (!dateVal) return;
+    try {
+      const existing = configForm.wedding_date ? new Date(configForm.wedding_date) : new Date();
+      const [y, m, d] = dateVal.split('-').map(Number);
+      existing.setFullYear(y, m - 1, d);
+      setConfigForm((prev) => ({ ...prev, wedding_date: existing.toISOString() }));
+    } catch {}
+  };
+
+  // Quick Time Picker handler
+  const handleTimePickerChange = (timeVal: string) => {
+    if (!timeVal) return;
+    try {
+      const existing = configForm.wedding_date ? new Date(configForm.wedding_date) : new Date();
+      const [h, min] = timeVal.split(':').map(Number);
+      existing.setHours(h, min, 0, 0);
+      setConfigForm((prev) => ({ ...prev, wedding_date: existing.toISOString() }));
+    } catch {}
+  };
+
+  // Human readable date preview
+  const getFormattedHumanDate = () => {
+    if (!configForm.wedding_date) return 'Belum diatur';
+    try {
+      const d = new Date(configForm.wedding_date);
+      if (isNaN(d.getTime())) return 'Format belum valid';
+      return (
+        d.toLocaleDateString('id-ID', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        }) + ' WIB'
+      );
+    } catch {
+      return '-';
+    }
+  };
+
+  // Real-time Countdown calculation for preview
+  const getCountdownPreview = () => {
+    if (!configForm.wedding_date) return 'Menunggu tanggal diatur...';
+    try {
+      const target = new Date(configForm.wedding_date).getTime();
+      if (isNaN(target)) return 'Format tanggal belum valid';
+      const diff = target - Date.now();
+      if (diff <= 0) return 'Acara sedang/telah berlangsung';
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      return `Sisa: ${days} Hari, ${hours} Jam, ${mins} Menit lagi`;
+    } catch {
+      return '-';
+    }
+  };
+
+  // Video Clear / Delete Handler
+  const handleDeleteVideo = () => {
+    if (window.confirm('Hapus video pernikahan berdua dari database & halaman undangan?')) {
+      setConfigForm((prev) => ({
+        ...prev,
+        video_url: '',
+        video_title: '',
+        video_description: '',
+      }));
+    }
+  };
+
   // Invitation Link generator
   const currentBaseUrl = typeof window !== 'undefined' ? window.location.origin : '';
   const generatedLink = guestNameInput.trim()
@@ -350,12 +478,76 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     setTimeout(() => setCopiedLink(false), 2000);
   };
 
+  // Dynamic WhatsApp invitation message formatter
+  const getFormattedWaMessage = (targetGuest?: string) => {
+    const tpl = (configForm.wa_template || config?.wa_template || DEFAULT_WA_TEMPLATE).trim();
+    const groom = configForm.groom_name || config?.groom_name || 'Dimas';
+    const bride = configForm.bride_name || config?.bride_name || 'Althea';
+    const guest = (targetGuest || guestNameInput || '').trim() || 'Bapak/Ibu/Saudara/i';
+    const link = guestNameInput.trim()
+      ? `${currentBaseUrl}/?to=${encodeURIComponent(guestNameInput.trim())}`
+      : currentBaseUrl;
+
+    let formattedDate = 'Minggu, 18 Oktober 2026';
+    try {
+      const rawDate = configForm.wedding_date || config?.wedding_date;
+      if (rawDate) {
+        formattedDate = new Date(rawDate).toLocaleDateString('id-ID', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        });
+      }
+    } catch {}
+
+    const location =
+      configForm.akad_location || config?.akad_location || 'The Heritage Grand Ballroom, Jakarta';
+
+    return tpl
+      .replace(/{guest}/g, guest)
+      .replace(/{groom}/g, groom)
+      .replace(/{bride}/g, bride)
+      .replace(/{link}/g, link)
+      .replace(/{date}/g, formattedDate)
+      .replace(/{location}/g, location);
+  };
+
   const shareViaWhatsApp = () => {
-    const groom = config?.groom_name || 'Dimas';
-    const bride = config?.bride_name || 'Althea';
-    const guest = guestNameInput.trim() || 'Bapak/Ibu/Saudara/i';
-    const text = `Kepada Yth. ${guest},\n\nTanpa mengurangi rasa hormat, kami bermaksud mengundang Bapak/Ibu/Saudara/i untuk menghadiri acara pernikahan kami:\n\n*${groom} & ${bride}*\n\nInformasi lengkap dan konfirmasi kehadiran dapat diakses melalui tautan undangan digital 3D berikut:\n${generatedLink}\n\nMerupakan suatu kehormatan bagi kami apabila Anda berkenan hadir dan memberikan doa restu.\n\nTerima kasih.`;
+    const text = getFormattedWaMessage();
     window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
+  };
+
+  const copyFullWaMessage = () => {
+    const text = getFormattedWaMessage();
+    navigator.clipboard.writeText(text);
+    setCopiedWaMessage(true);
+    setTimeout(() => setCopiedWaMessage(false), 2500);
+  };
+
+  const handleSaveWaTemplate = async () => {
+    setWaTemplateSaving(true);
+    setWaTemplateSuccess('');
+    try {
+      const updated = await updateWeddingConfig({
+        ...configForm,
+        wa_template: configForm.wa_template || DEFAULT_WA_TEMPLATE,
+      });
+      onConfigChange(updated);
+      setConfigForm(updated);
+      setWaTemplateSuccess('Template kata-kata WhatsApp berhasil disimpan ke database backend!');
+      setTimeout(() => setWaTemplateSuccess(''), 4000);
+    } catch (err: any) {
+      alert(err.message || 'Gagal menyimpan template WhatsApp');
+    } finally {
+      setWaTemplateSaving(false);
+    }
+  };
+
+  const handleResetWaTemplate = () => {
+    if (window.confirm('Kembalikan template kata-kata WhatsApp ke format standar resmi?')) {
+      setConfigForm((prev) => ({ ...prev, wa_template: DEFAULT_WA_TEMPLATE }));
+    }
   };
 
   const handleExportCsv = () => {
@@ -932,32 +1124,92 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 <div className="flex items-center gap-2 text-amber-300">
                   <Sparkles className="w-4 h-4" />
                   <h4 className="text-xs font-bold uppercase tracking-wider">
-                    Judul Undangan & Tanggal Acara Utama
+                    Judul Undangan & Tanggal Countdown Acara Utama
                   </h4>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[11px] text-zinc-400 mb-1">
-                      Judul Header / Sampul (Cover Title)
+
+                <div>
+                  <label className="block text-[11px] text-zinc-400 mb-1">
+                    Judul Header / Sampul (Cover Title)
+                  </label>
+                  <input
+                    type="text"
+                    value={configForm.cover_title || ''}
+                    onChange={(e) => setConfigForm({ ...configForm, cover_title: e.target.value })}
+                    placeholder="Contoh: The Wedding Of / The Royal Wedding"
+                    className="w-full px-3 py-2 rounded-xl bg-black/60 border border-zinc-700 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-400"
+                  />
+                </div>
+
+                {/* Flexible Date & Countdown Controls */}
+                <div className="pt-2 border-t border-zinc-800/80 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-semibold text-amber-200/90 flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Pengaturan Tanggal & Waktu Countdown 3D</span>
                     </label>
-                    <input
-                      type="text"
-                      value={configForm.cover_title || ''}
-                      onChange={(e) => setConfigForm({ ...configForm, cover_title: e.target.value })}
-                      placeholder="Contoh: The Wedding Of / The Royal Wedding"
-                      className="w-full px-3 py-2 rounded-xl bg-black/60 border border-zinc-700 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-400"
-                    />
+                    <span className="text-[10px] text-zinc-400">Bisa ketik manual atau pilih kalender</span>
                   </div>
-                  <div>
-                    <label className="block text-[11px] text-zinc-400 mb-1">
-                      Tanggal & Jam Acara (Untuk Countdown 3D)
-                    </label>
-                    <input
-                      type="datetime-local"
-                      value={configForm.wedding_date ? configForm.wedding_date.substring(0, 16) : ''}
-                      onChange={(e) => setConfigForm({ ...configForm, wedding_date: e.target.value ? new Date(e.target.value).toISOString() : '' })}
-                      className="w-full px-3 py-2 rounded-xl bg-black/60 border border-zinc-700 text-xs text-white focus:outline-none focus:border-amber-400"
-                    />
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    {/* Method 1: Direct Manual Text Typing */}
+                    <div className="md:col-span-1">
+                      <label className="block text-[10px] text-zinc-400 mb-1">
+                        Ketik Tanggal Manual (Format: YYYY-MM-DD HH:mm)
+                      </label>
+                      <input
+                        type="text"
+                        value={manualDateInput}
+                        onChange={(e) => handleManualDateType(e.target.value)}
+                        placeholder="Contoh: 2026-10-18 08:00"
+                        className="w-full px-3 py-2 rounded-xl bg-black/60 border border-amber-500/40 text-xs text-amber-300 font-mono focus:outline-none focus:border-amber-400"
+                      />
+                      <span className="text-[9px] text-zinc-500 block mt-0.5">
+                        Ketik bebas, countdown langsung menyesuaikan
+                      </span>
+                    </div>
+
+                    {/* Method 2: Date Picker */}
+                    <div>
+                      <label className="block text-[10px] text-zinc-400 mb-1">
+                        Pilih Kalender Tanggal
+                      </label>
+                      <input
+                        type="date"
+                        value={configForm.wedding_date ? configForm.wedding_date.substring(0, 10) : ''}
+                        onChange={(e) => handleDatePickerChange(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl bg-black/60 border border-zinc-700 text-xs text-white focus:outline-none focus:border-amber-400"
+                      />
+                    </div>
+
+                    {/* Method 3: Time Picker */}
+                    <div>
+                      <label className="block text-[10px] text-zinc-400 mb-1">
+                        Pilih Jam Acara
+                      </label>
+                      <input
+                        type="time"
+                        value={
+                          configForm.wedding_date
+                            ? new Date(configForm.wedding_date).toTimeString().substring(0, 5)
+                            : '08:00'
+                        }
+                        onChange={(e) => handleTimePickerChange(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl bg-black/60 border border-zinc-700 text-xs text-white focus:outline-none focus:border-amber-400"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Real-time Status and Preview Box */}
+                  <div className="p-3 rounded-xl bg-amber-950/20 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                    <div>
+                      <span className="text-zinc-400 text-[11px] block">Waktu Acara Terbaca:</span>
+                      <p className="font-semibold text-amber-300">{getFormattedHumanDate()}</p>
+                    </div>
+                    <div className="sm:text-right">
+                      <span className="text-zinc-400 text-[11px] block">Pratinjau Hitung Mundur 3D:</span>
+                      <p className="font-mono text-xs text-emerald-400 font-semibold">{getCountdownPreview()}</p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1404,6 +1656,117 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 </div>
               </div>
 
+              {/* Video Pre-Wedding & Kisah Berdua (Frontend Video CMS) */}
+              <div className="p-5 rounded-2xl bg-black/30 border border-amber-500/20 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-amber-300">
+                    <Film className="w-4 h-4" />
+                    <h4 className="text-xs font-bold uppercase tracking-wider">
+                      Video Pre-Wedding & Kisah Kita Berdua (Frontend Video)
+                    </h4>
+                  </div>
+                  {Boolean(configForm.video_url && configForm.video_url.trim()) && (
+                    <button
+                      type="button"
+                      onClick={handleDeleteVideo}
+                      className="px-3 py-1.5 rounded-lg bg-red-900/30 hover:bg-red-900/60 border border-red-500/30 text-red-300 text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Hapus / Kosongkan Video</span>
+                    </button>
+                  )}
+                </div>
+
+                <p className="text-xs text-zinc-400">
+                  Masukkan video berdua untuk ditampilkan di halaman depan undangan. Mendukung link <span className="text-amber-300 font-semibold">YouTube</span> (lengkap atau youtu.be), <span className="text-amber-300 font-semibold">Vimeo</span>, atau <span className="text-amber-300 font-semibold">file MP4 langsung</span>. Kosongkan link jika ingin menyembunyikan seksi video dari halaman depan.
+                </p>
+
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-[11px] text-zinc-400 mb-1">
+                      URL Video (YouTube / Vimeo / File MP4)
+                    </label>
+                    <input
+                      type="url"
+                      value={configForm.video_url || ''}
+                      onChange={(e) => setConfigForm({ ...configForm, video_url: e.target.value })}
+                      placeholder="Contoh: https://www.youtube.com/watch?v=dQw4w9WgXcQ atau https://youtu.be/..."
+                      className="w-full px-3 py-2 rounded-xl bg-black/60 border border-zinc-700 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-400 font-mono"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] text-zinc-400 mb-1">
+                        Judul Video (Opsional)
+                      </label>
+                      <input
+                        type="text"
+                        value={configForm.video_title || ''}
+                        onChange={(e) => setConfigForm({ ...configForm, video_title: e.target.value })}
+                        placeholder="Contoh: Our Cinematic Love Story"
+                        className="w-full px-3 py-2 rounded-xl bg-black/60 border border-zinc-700 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-400"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] text-zinc-400 mb-1">
+                        Keterangan Singkat / Caption (Opsional)
+                      </label>
+                      <input
+                        type="text"
+                        value={configForm.video_description || ''}
+                        onChange={(e) => setConfigForm({ ...configForm, video_description: e.target.value })}
+                        placeholder="Contoh: Perjalanan kasih kami menuju hari bahagia..."
+                        className="w-full px-3 py-2 rounded-xl bg-black/60 border border-zinc-700 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-400"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Video Live Preview Box */}
+                  {configForm.video_url && configForm.video_url.trim() ? (
+                    <div className="mt-3 p-3 rounded-xl bg-black/60 border border-amber-500/30 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] text-amber-300 font-medium flex items-center gap-1.5">
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                          Pratinjau Video Berdua:
+                        </span>
+                        <span className="text-[10px] text-zinc-400">Akan tampil di beranda undangan</span>
+                      </div>
+                      <div className="relative aspect-video w-full max-w-md rounded-lg overflow-hidden border border-zinc-800 bg-black">
+                        {configForm.video_url.includes('youtube.com') || configForm.video_url.includes('youtu.be') ? (
+                          <iframe
+                            src={`https://www.youtube-nocookie.com/embed/${
+                              configForm.video_url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/)?.[1] || ''
+                            }`}
+                            title="Pratinjau Video"
+                            className="w-full h-full"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowFullScreen
+                          />
+                        ) : configForm.video_url.includes('vimeo.com') ? (
+                          <iframe
+                            src={`https://player.vimeo.com/video/${configForm.video_url.match(/vimeo\.com\/(?:channels\/(?:\w+\/)?|groups\/([^\/]*)\/videos\/|album\/(\d+)\/video\/|video\/|)(\d+)/)?.[3] || ''}`}
+                            title="Pratinjau Video"
+                            className="w-full h-full"
+                            allowFullScreen
+                          />
+                        ) : (
+                          <video
+                            src={configForm.video_url}
+                            controls
+                            className="w-full h-full object-contain"
+                          />
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-3 rounded-xl bg-zinc-900/40 border border-zinc-800 text-[11px] text-zinc-400 flex items-center justify-between">
+                      <span>Status Video: Belum ada video aktif. Seksi video disembunyikan dari halaman depan.</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {/* Bottom Action Button */}
               <div className="flex justify-end pt-2">
                 <button
@@ -1419,54 +1782,172 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           </div>
         )}
 
-        {/* TAB 6: INVITATION LINK GENERATOR */}
+        {/* TAB 6: INVITATION LINK GENERATOR & WHATSAPP TEMPLATE CMS */}
         {activeTab === 'invite' && (
-          <div className="glass-gold rounded-3xl p-6 sm:p-8 border border-amber-500/20 max-w-2xl mx-auto space-y-6">
-            <div className="flex items-center gap-2">
-              <Link className="w-5 h-5 text-amber-400" />
-              <h3 className="font-serif-cormorant text-2xl font-semibold text-amber-100">
-                Pembuat Tautan Undangan Kustom Tamu
-              </h3>
+          <div className="glass-gold rounded-3xl p-6 sm:p-8 border border-amber-500/20 max-w-3xl mx-auto space-y-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Link className="w-5 h-5 text-amber-400" />
+                <h3 className="font-serif-cormorant text-2xl font-semibold text-amber-100">
+                  Tautan Undangan Tamu & Format WhatsApp
+                </h3>
+              </div>
+              <span className="text-[11px] px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                Database Backend Aktif
+              </span>
             </div>
+
             <p className="text-xs text-zinc-400">
-              Ketikkan nama tamu atau keluarga untuk membuat tautan undangan personal yang ramah WhatsApp:
+              Ketikkan nama tamu atau keluarga untuk membuat tautan undangan personal serta kata-kata undangan otomatis yang tersimpan di database untuk dikirim via WhatsApp.
             </p>
 
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-amber-200/80 mb-2">
-                Nama Tamu Undangan
+            {/* Input Nama Tamu */}
+            <div className="p-4 rounded-2xl bg-black/40 border border-amber-500/20 space-y-2">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-amber-200/90">
+                Nama Tamu / Keluarga Yang Diundang
               </label>
               <input
                 type="text"
                 value={guestNameInput}
                 onChange={(e) => setGuestNameInput(e.target.value)}
-                placeholder="Contoh: Bpk. Bambang & Keluarga"
-                className="w-full px-4 py-3 rounded-xl bg-black/60 border border-amber-500/30 text-white placeholder-zinc-500 text-sm focus:outline-none focus:border-amber-400"
+                placeholder="Contoh: Bpk. Bambang & Keluarga / Sahabat SMA"
+                className="w-full px-4 py-3 rounded-xl bg-black/70 border border-amber-500/30 text-white placeholder-zinc-500 text-sm focus:outline-none focus:border-amber-400"
               />
+              <span className="text-[11px] text-zinc-500 block">
+                Nama tamu akan otomatis disematkan pada tautan serta pesan WhatsApp di bawah ini.
+              </span>
             </div>
 
-            {/* Generated Link Box */}
-            <div className="p-4 rounded-2xl bg-black/50 border border-amber-500/20">
-              <span className="text-[11px] text-zinc-400 block mb-1">Tautan Personal:</span>
-              <p className="font-mono text-xs text-amber-300 break-all select-all mb-4">
+            {/* Generated Personal Link Box */}
+            <div className="p-4 rounded-2xl bg-black/50 border border-amber-500/20 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold text-zinc-300">Tautan Undangan Personal:</span>
+                <span className="text-[10px] text-zinc-500">Otomatis membuka nama tamu di cover</span>
+              </div>
+              <p className="font-mono text-xs text-amber-300 break-all select-all p-2.5 rounded-lg bg-black/60 border border-zinc-800">
                 {generatedLink}
               </p>
 
-              <div className="flex flex-wrap gap-3">
+              <div className="flex flex-wrap gap-2 pt-1">
                 <button
+                  type="button"
                   onClick={copyGeneratedLink}
-                  className="px-4 py-2 rounded-xl bg-amber-400 text-black font-semibold text-xs flex items-center gap-2 hover:bg-amber-300 transition-colors cursor-pointer"
+                  className="px-3.5 py-2 rounded-xl bg-amber-400 text-black font-semibold text-xs flex items-center gap-1.5 hover:bg-amber-300 transition-colors cursor-pointer"
                 >
                   {copiedLink ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                  <span>{copiedLink ? 'Link Berhasil Disalin!' : 'Salin Tautan'}</span>
+                  <span>{copiedLink ? 'Link Tersalin!' : 'Salin Tautan Saja'}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* WhatsApp Template Editor (Database Backend) */}
+            <div className="p-5 rounded-2xl bg-black/40 border border-amber-500/30 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-amber-300">
+                  <Share2 className="w-4 h-4 text-emerald-400" />
+                  <h4 className="text-xs font-bold uppercase tracking-wider">
+                    Template Kata-Kata Undangan WhatsApp (Database)
+                  </h4>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleResetWaTemplate}
+                  className="text-[10px] text-zinc-400 hover:text-amber-300 underline cursor-pointer"
+                >
+                  Kembalikan ke Teks Standar
+                </button>
+              </div>
+
+              <p className="text-xs text-zinc-400">
+                Kata-kata di bawah ini tersimpan di database backend. Anda dapat mengubah isi pesan sesuai kebutuhan. Gunakan kode variabel di bawah ini agar teks terisi otomatis:
+              </p>
+
+              {/* Variable Chips */}
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  { tag: '{guest}', label: 'Nama Tamu' },
+                  { tag: '{groom}', label: 'Mempelai Pria' },
+                  { tag: '{bride}', label: 'Mempelai Wanita' },
+                  { tag: '{date}', label: 'Tanggal Acara' },
+                  { tag: '{location}', label: 'Lokasi Acara' },
+                  { tag: '{link}', label: 'Link Undangan' },
+                ].map((item) => (
+                  <button
+                    key={item.tag}
+                    type="button"
+                    onClick={() => {
+                      const current = configForm.wa_template || DEFAULT_WA_TEMPLATE;
+                      setConfigForm({ ...configForm, wa_template: current + ` ${item.tag}` });
+                    }}
+                    className="px-2 py-1 rounded-md bg-amber-500/15 border border-amber-500/30 hover:bg-amber-500/30 text-amber-300 font-mono text-[11px] transition-colors cursor-pointer"
+                    title={`Klik untuk menambahkan ${item.tag}`}
+                  >
+                    +{item.tag} <span className="text-zinc-400 font-sans text-[10px]">({item.label})</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Textarea for WhatsApp Template */}
+              <textarea
+                rows={10}
+                value={configForm.wa_template ?? DEFAULT_WA_TEMPLATE}
+                onChange={(e) => setConfigForm({ ...configForm, wa_template: e.target.value })}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-black/70 border border-zinc-700 text-xs text-zinc-200 font-sans leading-relaxed focus:outline-none focus:border-amber-400"
+                placeholder="Tuliskan format kata-kata undangan di sini..."
+              />
+
+              {waTemplateSuccess && (
+                <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/40 text-emerald-200 text-xs flex items-center gap-2">
+                  <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>{waTemplateSuccess}</span>
+                </div>
+              )}
+
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  disabled={waTemplateSaving}
+                  onClick={handleSaveWaTemplate}
+                  className="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-black font-semibold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  {waTemplateSaving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                  <span>Simpan Template Kata-Kata ke Database</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Real-time WhatsApp Message Preview (WhatsApp Chat Bubble Look) */}
+            <div className="p-5 rounded-2xl bg-[#0b141a] border border-[#222d34] space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-emerald-400 flex items-center gap-1.5">
+                  <Share2 className="w-3.5 h-3.5" />
+                  Pratinjau Hasil Pesan WhatsApp (Siap Dikirim):
+                </span>
+                <span className="text-[10px] text-zinc-400">Tampilan persis yang diterima tamu</span>
+              </div>
+
+              <div className="p-4 rounded-xl bg-[#1f2c34] border border-[#2a3942] text-xs text-zinc-200 font-sans whitespace-pre-wrap leading-relaxed shadow-inner">
+                {getFormattedWaMessage()}
+              </div>
+
+              {/* Action Buttons for WhatsApp Sharing */}
+              <div className="flex flex-wrap gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={shareViaWhatsApp}
+                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs flex items-center gap-2 transition-all cursor-pointer shadow-md"
+                >
+                  <Share2 className="w-4 h-4" />
+                  <span>Buka & Kirim Langsung ke WhatsApp</span>
                 </button>
 
                 <button
-                  onClick={shareViaWhatsApp}
-                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs flex items-center gap-2 transition-colors cursor-pointer"
+                  type="button"
+                  onClick={copyFullWaMessage}
+                  className="px-4 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 font-medium text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
                 >
-                  <Share2 className="w-3.5 h-3.5" />
-                  <span>Kirim via WhatsApp</span>
+                  {copiedWaMessage ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copiedWaMessage ? 'Pesan WhatsApp Berhasil Disalin!' : 'Salin Seluruh Teks Pesan'}</span>
                 </button>
               </div>
             </div>
