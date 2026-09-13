@@ -19,6 +19,9 @@ export const CoupleSection: React.FC<CoupleSectionProps> = ({ config }) => {
   const brideParents = config?.bride_parents || 'Putri kedua dari Bpk. Hendra Gunawan & Ibu Rina Marlina';
   const brideIg = config?.bride_instagram || '@altheamhrn';
 
+  const groomPhoto = config?.groom_photo || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=500&q=80';
+  const bridePhoto = config?.bride_photo || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=500&q=80';
+
   return (
     <section id="couple" className="relative py-20 px-4">
       <motion.div
@@ -60,7 +63,7 @@ export const CoupleSection: React.FC<CoupleSectionProps> = ({ config }) => {
             {/* Avatar Photo Frame */}
             <div className="w-36 h-36 sm:w-44 sm:h-44 rounded-full p-1.5 bg-gradient-to-tr from-amber-600 to-amber-300 mb-6 shadow-[0_0_20px_rgba(212,175,55,0.3)] group-hover:scale-105 transition-transform duration-300">
               <img
-                src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=500&q=80"
+                src={groomPhoto}
                 alt={groomFullName}
                 className="w-full h-full object-cover rounded-full"
                 referrerPolicy="no-referrer"
@@ -101,7 +104,7 @@ export const CoupleSection: React.FC<CoupleSectionProps> = ({ config }) => {
             {/* Avatar Photo Frame */}
             <div className="w-36 h-36 sm:w-44 sm:h-44 rounded-full p-1.5 bg-gradient-to-tr from-amber-600 to-amber-300 mb-6 shadow-[0_0_20px_rgba(212,175,55,0.3)] group-hover:scale-105 transition-transform duration-300">
               <img
-                src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=500&q=80"
+                src={bridePhoto}
                 alt={brideFullName}
                 className="w-full h-full object-cover rounded-full"
                 referrerPolicy="no-referrer"

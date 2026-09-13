@@ -4,16 +4,25 @@ export interface BankAccount {
   accountName: string;
 }
 
+export interface LoveStoryMilestone {
+  year: string;
+  title: string;
+  description: string;
+}
+
 export interface WeddingConfig {
   id: string;
+  cover_title?: string;
   groom_name: string;
   groom_full_name: string;
   groom_parents: string;
   groom_instagram?: string;
+  groom_photo?: string;
   bride_name: string;
   bride_full_name: string;
   bride_parents: string;
   bride_instagram?: string;
+  bride_photo?: string;
   wedding_date: string;
   akad_time: string;
   akad_location: string;
@@ -27,6 +36,10 @@ export interface WeddingConfig {
   quote_source: string;
   audio_url?: string;
   bank_accounts: BankAccount[];
+  gift_address?: string;
+  gift_receiver?: string;
+  gift_phone?: string;
+  love_story?: LoveStoryMilestone[];
   updated_at?: string;
 }
 

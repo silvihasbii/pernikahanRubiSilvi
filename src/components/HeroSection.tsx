@@ -46,7 +46,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ config, guestName }) =
         {/* Monogram / Header Badge */}
         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full glass-gold text-amber-300 text-xs font-medium tracking-[0.25em] uppercase mb-4 shadow-sm">
           <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-          <span>The Royal Wedding</span>
+          <span>{config?.cover_title || 'The Royal Wedding'}</span>
           <Sparkles className="w-3.5 h-3.5 text-amber-400" />
         </div>
 

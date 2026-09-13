@@ -1,38 +1,45 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { Sparkles, Heart, Compass, Gem } from 'lucide-react';
+import { WeddingConfig } from '../types';
 
-export const StorySection: React.FC = () => {
-  const milestones = [
+interface StorySectionProps {
+  config: WeddingConfig | null;
+}
+
+export const StorySection: React.FC<StorySectionProps> = ({ config }) => {
+  const defaultMilestones = [
     {
       year: '2021',
       title: 'Awal Pertemuan',
       description:
         'Takdir mempertemukan kami di sebuah sudut perpustakaan kota tua. Percakapan santai tentang karya seni dan arsitektur menjadi gerbang benih-benih cinta.',
-      icon: Compass,
     },
     {
       year: '2023',
       title: 'Menjalin Komitmen',
       description:
         'Dua kepribadian, dua keluarga, bersatu dalam saling pengertian. Kami belajar bertumbuh bersama, saling melengkapi suka dan duka.',
-      icon: Heart,
     },
     {
       year: '2025',
       title: 'Untaian Janji / The Proposal',
       description:
         'Di bawah taburan bintang di tepi pantai Bali, cincin tanda kesetiaan disematkan. Dengan mata berbinar bahagia, sebuah kata "Yes" mengunci takdir kami.',
-      icon: Sparkles,
     },
     {
       year: '2026',
       title: 'Menuju Hari Abadi',
       description:
         'Kini langkah kami bermuara pada janji suci pernikahan. Dengan ridho keluarga dan doa sahabat, kami memulai babak terindah dalam hidup.',
-      icon: Heart,
     },
   ];
+
+  const milestones = config?.love_story && config.love_story.length > 0
+    ? config.love_story
+    : defaultMilestones;
+
+  const icons = [Compass, Heart, Sparkles, Gem];
 
   return (
     <section id="story" className="relative py-20 px-4">
@@ -60,10 +67,10 @@ export const StorySection: React.FC = () => {
         {/* Timeline */}
         <div className="relative border-l-2 border-amber-500/30 ml-4 sm:ml-32 text-left space-y-12">
           {milestones.map((item, idx) => {
-            const Icon = item.icon;
+            const Icon = icons[idx % icons.length];
             return (
               <motion.div
-                key={item.year}
+                key={`${item.year}-${idx}`}
                 initial={{ opacity: 0, x: 20 }}
                 whileInView={{ opacity: 1, x: 0 }}
                 viewport={{ once: true }}

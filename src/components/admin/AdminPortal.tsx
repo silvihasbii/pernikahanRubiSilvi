@@ -18,12 +18,20 @@ import {
   ShieldCheck,
   AlertCircle,
   Eye,
-  Plus
+  EyeOff,
+  Plus,
+  Calendar,
+  MapPin,
+  CreditCard,
+  Package,
+  Heart,
+  Sparkles,
 } from 'lucide-react';
 import {
   adminLogin,
   adminVerifyToken,
   removeAdminToken,
+  changeAdminPassword,
   fetchAdminStats,
   fetchRsvps,
   fetchWishes,
@@ -34,7 +42,7 @@ import {
   deleteAdminRsvp,
   updateWeddingConfig,
 } from '../../services/api';
-import { AdminStats, AdminUser, GalleryPhoto, RsvpItem, WeddingConfig, WishItem } from '../../types';
+import { AdminStats, AdminUser, GalleryPhoto, RsvpItem, WeddingConfig, WishItem, BankAccount, LoveStoryMilestone } from '../../types';
 
 interface AdminPortalProps {
   config: WeddingConfig | null;
@@ -57,7 +65,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [loginError, setLoginError] = useState('');
 
   // Dashboard state
-  const [activeTab, setActiveTab] = useState<'overview' | 'photos' | 'rsvps' | 'wishes' | 'config' | 'invite'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'photos' | 'rsvps' | 'wishes' | 'config' | 'invite' | 'security'>('overview');
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [rsvps, setRsvps] = useState<RsvpItem[]>([]);
   const [wishes, setWishes] = useState<WishItem[]>([]);
@@ -78,6 +86,17 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [configForm, setConfigForm] = useState<Partial<WeddingConfig>>({});
   const [configSaving, setConfigSaving] = useState(false);
   const [configSuccess, setConfigSuccess] = useState('');
+
+  // Security change password state
+  const [newUsernameInput, setNewUsernameInput] = useState('');
+  const [oldPasswordInput, setOldPasswordInput] = useState('');
+  const [newPasswordInput, setNewPasswordInput] = useState('');
+  const [confirmPasswordInput, setConfirmPasswordInput] = useState('');
+  const [showOldPassword, setShowOldPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  const [passwordSuccess, setPasswordSuccess] = useState('');
+  const [passwordError, setPasswordError] = useState('');
 
   // Invite link generator state
   const [guestNameInput, setGuestNameInput] = useState('');
@@ -228,6 +247,95 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     } finally {
       setConfigSaving(false);
     }
+  };
+
+  // Change Admin Password / Username Handler
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordError('');
+    setPasswordSuccess('');
+
+    if (!oldPasswordInput) {
+      setPasswordError('Silakan masukkan password lama Anda.');
+      return;
+    }
+
+    if (!newPasswordInput || newPasswordInput.length < 6) {
+      setPasswordError('Password baru minimal harus 6 karakter.');
+      return;
+    }
+
+    if (newPasswordInput !== confirmPasswordInput) {
+      setPasswordError('Konfirmasi password baru tidak cocok. Periksa kembali.');
+      return;
+    }
+
+    setPasswordLoading(true);
+    try {
+      const res = await changeAdminPassword(
+        oldPasswordInput,
+        newPasswordInput,
+        newUsernameInput.trim() || undefined
+      );
+      setPasswordSuccess(res.message || 'Kredensial admin berhasil diperbarui di database!');
+      setOldPasswordInput('');
+      setNewPasswordInput('');
+      setConfirmPasswordInput('');
+      if (res.admin) {
+        setAdminUser(res.admin);
+      }
+      setTimeout(() => setPasswordSuccess(''), 5000);
+    } catch (err: any) {
+      setPasswordError(err.message || 'Gagal mengubah password');
+    } finally {
+      setPasswordLoading(false);
+    }
+  };
+
+  // Dynamic Bank Accounts Helpers
+  const handleAddBankAccount = () => {
+    const current = configForm.bank_accounts || [];
+    setConfigForm({
+      ...configForm,
+      bank_accounts: [...current, { bank: 'BCA', accountNumber: '', accountName: '' }],
+    });
+  };
+
+  const handleUpdateBankAccount = (index: number, field: keyof BankAccount, value: string) => {
+    const current = [...(configForm.bank_accounts || [])];
+    if (current[index]) {
+      current[index] = { ...current[index], [field]: value };
+      setConfigForm({ ...configForm, bank_accounts: current });
+    }
+  };
+
+  const handleRemoveBankAccount = (index: number) => {
+    const current = [...(configForm.bank_accounts || [])];
+    current.splice(index, 1);
+    setConfigForm({ ...configForm, bank_accounts: current });
+  };
+
+  // Dynamic Love Story Milestones Helpers
+  const handleAddMilestone = () => {
+    const current = configForm.love_story || [];
+    setConfigForm({
+      ...configForm,
+      love_story: [...current, { year: `${new Date().getFullYear()}`, title: '', description: '' }],
+    });
+  };
+
+  const handleUpdateMilestone = (index: number, field: keyof LoveStoryMilestone, value: string) => {
+    const current = [...(configForm.love_story || [])];
+    if (current[index]) {
+      current[index] = { ...current[index], [field]: value };
+      setConfigForm({ ...configForm, love_story: current });
+    }
+  };
+
+  const handleRemoveMilestone = (index: number) => {
+    const current = [...(configForm.love_story || [])];
+    current.splice(index, 1);
+    setConfigForm({ ...configForm, love_story: current });
   };
 
   // Invitation Link generator
@@ -424,8 +532,9 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
             { id: 'photos', label: 'Kelola Galeri & Upload', icon: ImageIcon },
             { id: 'rsvps', label: 'Daftar Tamu RSVP', icon: Users },
             { id: 'wishes', label: 'Moderasi Doa Restu', icon: MessageSquare },
-            { id: 'config', label: 'Pengaturan Acara', icon: Settings },
+            { id: 'config', label: 'Kelola Konten & Acara', icon: Settings },
             { id: 'invite', label: 'Buat Link Tamu', icon: Link },
+            { id: 'security', label: 'Ganti Password & Akun', icon: KeyRound },
           ].map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -790,22 +899,71 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
         {/* TAB 5: WEDDING CONFIG */}
         {activeTab === 'config' && (
           <div className="glass-gold rounded-3xl p-6 sm:p-8 border border-amber-500/20">
-            <h3 className="font-serif-cormorant text-2xl font-semibold text-amber-100 mb-2">
-              Pengaturan Informasi Undangan
-            </h3>
-            <p className="text-xs text-zinc-400 mb-6">
-              Perubahan disimpan langsung ke SQLite database dan tersinkronisasi real-time
-            </p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+              <div>
+                <h3 className="font-serif-cormorant text-2xl font-semibold text-amber-100 mb-1">
+                  Kelola Konten & Informasi Undangan (Full CMS)
+                </h3>
+                <p className="text-xs text-zinc-400">
+                  Ubah semua teks, foto mempelai, jadwal, rekening, kado, dan kisah cinta langsung ke database SQLite backend
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleSaveConfig}
+                disabled={configSaving}
+                className="px-5 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-black font-semibold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer shrink-0 shadow-md"
+              >
+                {configSaving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                <span>Simpan Perubahan</span>
+              </button>
+            </div>
 
             {configSuccess && (
               <div className="mb-6 p-3.5 rounded-xl bg-emerald-950/40 border border-emerald-500/40 text-emerald-200 text-xs flex items-center gap-2">
-                <Check className="w-4 h-4" />
+                <Check className="w-4 h-4 text-emerald-400 shrink-0" />
                 <span>{configSuccess}</span>
               </div>
             )}
 
             <form onSubmit={handleSaveConfig} className="space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              {/* Cover Title & Main Wedding Date */}
+              <div className="p-5 rounded-2xl bg-black/30 border border-amber-500/20 space-y-4">
+                <div className="flex items-center gap-2 text-amber-300">
+                  <Sparkles className="w-4 h-4" />
+                  <h4 className="text-xs font-bold uppercase tracking-wider">
+                    Judul Undangan & Tanggal Acara Utama
+                  </h4>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[11px] text-zinc-400 mb-1">
+                      Judul Header / Sampul (Cover Title)
+                    </label>
+                    <input
+                      type="text"
+                      value={configForm.cover_title || ''}
+                      onChange={(e) => setConfigForm({ ...configForm, cover_title: e.target.value })}
+                      placeholder="Contoh: The Wedding Of / The Royal Wedding"
+                      className="w-full px-3 py-2 rounded-xl bg-black/60 border border-zinc-700 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-zinc-400 mb-1">
+                      Tanggal & Jam Acara (Untuk Countdown 3D)
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={configForm.wedding_date ? configForm.wedding_date.substring(0, 16) : ''}
+                      onChange={(e) => setConfigForm({ ...configForm, wedding_date: e.target.value ? new Date(e.target.value).toISOString() : '' })}
+                      className="w-full px-3 py-2 rounded-xl bg-black/60 border border-zinc-700 text-xs text-white focus:outline-none focus:border-amber-400"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Groom & Bride Info */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Groom Info */}
                 <div className="space-y-4 p-5 rounded-2xl bg-black/30 border border-amber-500/20">
                   <h4 className="text-xs font-bold uppercase tracking-wider text-amber-300">
@@ -817,7 +975,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       type="text"
                       value={configForm.groom_name || ''}
                       onChange={(e) => setConfigForm({ ...configForm, groom_name: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl bg-black/60 border border-zinc-700 text-xs text-white"
+                      className="w-full px-3 py-2 rounded-xl bg-black/60 border border-zinc-700 text-xs text-white focus:outline-none focus:border-amber-400"
                     />
                   </div>
                   <div>
@@ -826,7 +984,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       type="text"
                       value={configForm.groom_full_name || ''}
                       onChange={(e) => setConfigForm({ ...configForm, groom_full_name: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl bg-black/60 border border-zinc-700 text-xs text-white"
+                      className="w-full px-3 py-2 rounded-xl bg-black/60 border border-zinc-700 text-xs text-white focus:outline-none focus:border-amber-400"
                     />
                   </div>
                   <div>
@@ -835,8 +993,38 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       type="text"
                       value={configForm.groom_parents || ''}
                       onChange={(e) => setConfigForm({ ...configForm, groom_parents: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl bg-black/60 border border-zinc-700 text-xs text-white"
+                      className="w-full px-3 py-2 rounded-xl bg-black/60 border border-zinc-700 text-xs text-white focus:outline-none focus:border-amber-400"
                     />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-zinc-400 mb-1">Akun Instagram (Contoh: @dimas_aryap)</label>
+                    <input
+                      type="text"
+                      value={configForm.groom_instagram || ''}
+                      onChange={(e) => setConfigForm({ ...configForm, groom_instagram: e.target.value })}
+                      placeholder="@username"
+                      className="w-full px-3 py-2 rounded-xl bg-black/60 border border-zinc-700 text-xs text-white focus:outline-none focus:border-amber-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-zinc-400 mb-1">URL Foto Mempelai Pria</label>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="url"
+                        value={configForm.groom_photo || ''}
+                        onChange={(e) => setConfigForm({ ...configForm, groom_photo: e.target.value })}
+                        placeholder="https://..."
+                        className="w-full px-3 py-2 rounded-xl bg-black/60 border border-zinc-700 text-xs text-white focus:outline-none focus:border-amber-400"
+                      />
+                      {configForm.groom_photo && (
+                        <img
+                          src={configForm.groom_photo}
+                          alt="Preview Pria"
+                          className="w-9 h-9 rounded-full object-cover border border-amber-400/50 shrink-0"
+                          referrerPolicy="no-referrer"
+                        />
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -851,7 +1039,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       type="text"
                       value={configForm.bride_name || ''}
                       onChange={(e) => setConfigForm({ ...configForm, bride_name: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl bg-black/60 border border-zinc-700 text-xs text-white"
+                      className="w-full px-3 py-2 rounded-xl bg-black/60 border border-zinc-700 text-xs text-white focus:outline-none focus:border-amber-400"
                     />
                   </div>
                   <div>
@@ -860,7 +1048,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       type="text"
                       value={configForm.bride_full_name || ''}
                       onChange={(e) => setConfigForm({ ...configForm, bride_full_name: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl bg-black/60 border border-zinc-700 text-xs text-white"
+                      className="w-full px-3 py-2 rounded-xl bg-black/60 border border-zinc-700 text-xs text-white focus:outline-none focus:border-amber-400"
                     />
                   </div>
                   <div>
@@ -869,34 +1057,65 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       type="text"
                       value={configForm.bride_parents || ''}
                       onChange={(e) => setConfigForm({ ...configForm, bride_parents: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl bg-black/60 border border-zinc-700 text-xs text-white"
+                      className="w-full px-3 py-2 rounded-xl bg-black/60 border border-zinc-700 text-xs text-white focus:outline-none focus:border-amber-400"
                     />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-zinc-400 mb-1">Akun Instagram (Contoh: @altheamhrn)</label>
+                    <input
+                      type="text"
+                      value={configForm.bride_instagram || ''}
+                      onChange={(e) => setConfigForm({ ...configForm, bride_instagram: e.target.value })}
+                      placeholder="@username"
+                      className="w-full px-3 py-2 rounded-xl bg-black/60 border border-zinc-700 text-xs text-white focus:outline-none focus:border-amber-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-zinc-400 mb-1">URL Foto Mempelai Wanita</label>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="url"
+                        value={configForm.bride_photo || ''}
+                        onChange={(e) => setConfigForm({ ...configForm, bride_photo: e.target.value })}
+                        placeholder="https://..."
+                        className="w-full px-3 py-2 rounded-xl bg-black/60 border border-zinc-700 text-xs text-white focus:outline-none focus:border-amber-400"
+                      />
+                      {configForm.bride_photo && (
+                        <img
+                          src={configForm.bride_photo}
+                          alt="Preview Wanita"
+                          className="w-9 h-9 rounded-full object-cover border border-amber-400/50 shrink-0"
+                          referrerPolicy="no-referrer"
+                        />
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
 
               {/* Event Times & Venue */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-4 p-5 rounded-2xl bg-black/30 border border-amber-500/20">
                   <h4 className="text-xs font-bold uppercase tracking-wider text-amber-300">
                     Akad Nikah
                   </h4>
                   <div>
-                    <label className="block text-[11px] text-zinc-400 mb-1">Waktu</label>
+                    <label className="block text-[11px] text-zinc-400 mb-1">Waktu Pelaksanaan</label>
                     <input
                       type="text"
                       value={configForm.akad_time || ''}
                       onChange={(e) => setConfigForm({ ...configForm, akad_time: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl bg-black/60 border border-zinc-700 text-xs text-white"
+                      placeholder="08:00 - 10:00 WIB"
+                      className="w-full px-3 py-2 rounded-xl bg-black/60 border border-zinc-700 text-xs text-white focus:outline-none focus:border-amber-400"
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] text-zinc-400 mb-1">Lokasi Gedung</label>
+                    <label className="block text-[11px] text-zinc-400 mb-1">Lokasi Gedung / Tempat</label>
                     <input
                       type="text"
                       value={configForm.akad_location || ''}
                       onChange={(e) => setConfigForm({ ...configForm, akad_location: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl bg-black/60 border border-zinc-700 text-xs text-white"
+                      className="w-full px-3 py-2 rounded-xl bg-black/60 border border-zinc-700 text-xs text-white focus:outline-none focus:border-amber-400"
                     />
                   </div>
                   <div>
@@ -905,7 +1124,17 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       type="text"
                       value={configForm.akad_address || ''}
                       onChange={(e) => setConfigForm({ ...configForm, akad_address: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl bg-black/60 border border-zinc-700 text-xs text-white"
+                      className="w-full px-3 py-2 rounded-xl bg-black/60 border border-zinc-700 text-xs text-white focus:outline-none focus:border-amber-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-zinc-400 mb-1">Tautan Google Maps</label>
+                    <input
+                      type="url"
+                      value={configForm.akad_map_url || ''}
+                      onChange={(e) => setConfigForm({ ...configForm, akad_map_url: e.target.value })}
+                      placeholder="https://maps.google.com/?q=..."
+                      className="w-full px-3 py-2 rounded-xl bg-black/60 border border-zinc-700 text-xs text-white focus:outline-none focus:border-amber-400"
                     />
                   </div>
                 </div>
@@ -915,21 +1144,22 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                     Resepsi Pernikahan
                   </h4>
                   <div>
-                    <label className="block text-[11px] text-zinc-400 mb-1">Waktu</label>
+                    <label className="block text-[11px] text-zinc-400 mb-1">Waktu Pelaksanaan</label>
                     <input
                       type="text"
                       value={configForm.resepsi_time || ''}
                       onChange={(e) => setConfigForm({ ...configForm, resepsi_time: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl bg-black/60 border border-zinc-700 text-xs text-white"
+                      placeholder="11:00 - 15:00 WIB"
+                      className="w-full px-3 py-2 rounded-xl bg-black/60 border border-zinc-700 text-xs text-white focus:outline-none focus:border-amber-400"
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] text-zinc-400 mb-1">Lokasi Gedung</label>
+                    <label className="block text-[11px] text-zinc-400 mb-1">Lokasi Gedung / Tempat</label>
                     <input
                       type="text"
                       value={configForm.resepsi_location || ''}
                       onChange={(e) => setConfigForm({ ...configForm, resepsi_location: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl bg-black/60 border border-zinc-700 text-xs text-white"
+                      className="w-full px-3 py-2 rounded-xl bg-black/60 border border-zinc-700 text-xs text-white focus:outline-none focus:border-amber-400"
                     />
                   </div>
                   <div>
@@ -938,7 +1168,17 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       type="text"
                       value={configForm.resepsi_address || ''}
                       onChange={(e) => setConfigForm({ ...configForm, resepsi_address: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl bg-black/60 border border-zinc-700 text-xs text-white"
+                      className="w-full px-3 py-2 rounded-xl bg-black/60 border border-zinc-700 text-xs text-white focus:outline-none focus:border-amber-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-zinc-400 mb-1">Tautan Google Maps</label>
+                    <input
+                      type="url"
+                      value={configForm.resepsi_map_url || ''}
+                      onChange={(e) => setConfigForm({ ...configForm, resepsi_map_url: e.target.value })}
+                      placeholder="https://maps.google.com/?q=..."
+                      className="w-full px-3 py-2 rounded-xl bg-black/60 border border-zinc-700 text-xs text-white focus:outline-none focus:border-amber-400"
                     />
                   </div>
                 </div>
@@ -955,7 +1195,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                     rows={2}
                     value={configForm.quote || ''}
                     onChange={(e) => setConfigForm({ ...configForm, quote: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl bg-black/60 border border-zinc-700 text-xs text-white"
+                    className="w-full px-3 py-2 rounded-xl bg-black/60 border border-zinc-700 text-xs text-white focus:outline-none focus:border-amber-400"
                   />
                 </div>
                 <div>
@@ -964,19 +1204,215 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                     type="text"
                     value={configForm.quote_source || ''}
                     onChange={(e) => setConfigForm({ ...configForm, quote_source: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl bg-black/60 border border-zinc-700 text-xs text-white"
+                    className="w-full px-3 py-2 rounded-xl bg-black/60 border border-zinc-700 text-xs text-white focus:outline-none focus:border-amber-400"
                   />
                 </div>
               </div>
 
-              <div className="flex justify-end">
+              {/* Amplop Digital & Bank Accounts */}
+              <div className="p-5 rounded-2xl bg-black/30 border border-amber-500/20 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-amber-300">
+                    <CreditCard className="w-4 h-4" />
+                    <h4 className="text-xs font-bold uppercase tracking-wider">
+                      Amplop Digital & Rekening Transfer
+                    </h4>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAddBankAccount}
+                    className="px-3 py-1.5 rounded-lg bg-amber-400/20 hover:bg-amber-400/30 border border-amber-500/30 text-amber-300 text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Tambah Rekening</span>
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  {(configForm.bank_accounts || []).map((acc, idx) => (
+                    <div
+                      key={idx}
+                      className="grid grid-cols-1 sm:grid-cols-12 gap-2 p-3 rounded-xl bg-black/50 border border-zinc-800 items-center"
+                    >
+                      <div className="sm:col-span-3">
+                        <label className="block text-[10px] text-zinc-500 mb-0.5">Nama Bank / Dompet</label>
+                        <input
+                          type="text"
+                          value={acc.bank}
+                          onChange={(e) => handleUpdateBankAccount(idx, 'bank', e.target.value)}
+                          placeholder="BCA / Mandiri / Gopay"
+                          className="w-full px-2.5 py-1.5 rounded-lg bg-black/60 border border-zinc-700 text-xs text-white"
+                        />
+                      </div>
+                      <div className="sm:col-span-4">
+                        <label className="block text-[10px] text-zinc-500 mb-0.5">Nomor Rekening</label>
+                        <input
+                          type="text"
+                          value={acc.accountNumber}
+                          onChange={(e) => handleUpdateBankAccount(idx, 'accountNumber', e.target.value)}
+                          placeholder="8830-192-881"
+                          className="w-full px-2.5 py-1.5 rounded-lg bg-black/60 border border-zinc-700 text-xs text-white font-mono"
+                        />
+                      </div>
+                      <div className="sm:col-span-4">
+                        <label className="block text-[10px] text-zinc-500 mb-0.5">Atas Nama</label>
+                        <input
+                          type="text"
+                          value={acc.accountName}
+                          onChange={(e) => handleUpdateBankAccount(idx, 'accountName', e.target.value)}
+                          placeholder="Nama Pemilik"
+                          className="w-full px-2.5 py-1.5 rounded-lg bg-black/60 border border-zinc-700 text-xs text-white"
+                        />
+                      </div>
+                      <div className="sm:col-span-1 flex justify-end pt-3 sm:pt-0">
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveBankAccount(idx)}
+                          className="p-1.5 rounded-lg bg-red-900/30 hover:bg-red-900/60 text-red-300 transition-colors cursor-pointer"
+                          title="Hapus Rekening"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {(!configForm.bank_accounts || configForm.bank_accounts.length === 0) && (
+                    <p className="text-xs text-zinc-500 italic">Belum ada data rekening. Klik "+ Tambah Rekening" untuk menambahkan.</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Physical Gift Info */}
+              <div className="p-5 rounded-2xl bg-black/30 border border-amber-500/20 space-y-4">
+                <div className="flex items-center gap-2 text-amber-300">
+                  <Package className="w-4 h-4" />
+                  <h4 className="text-xs font-bold uppercase tracking-wider">
+                    Alamat Pengiriman Kado Fisik
+                  </h4>
+                </div>
+                <div>
+                  <label className="block text-[11px] text-zinc-400 mb-1">Alamat Lengkap Pengiriman Kado</label>
+                  <textarea
+                    rows={2}
+                    value={configForm.gift_address || ''}
+                    onChange={(e) => setConfigForm({ ...configForm, gift_address: e.target.value })}
+                    placeholder="Jl. Sunset Boulevard No. 88, Menteng, Jakarta Pusat 10310"
+                    className="w-full px-3 py-2 rounded-xl bg-black/60 border border-zinc-700 text-xs text-white focus:outline-none focus:border-amber-400"
+                  />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[11px] text-zinc-400 mb-1">Nama Penerima Kado</label>
+                    <input
+                      type="text"
+                      value={configForm.gift_receiver || ''}
+                      onChange={(e) => setConfigForm({ ...configForm, gift_receiver: e.target.value })}
+                      placeholder="Dimas & Althea"
+                      className="w-full px-3 py-2 rounded-xl bg-black/60 border border-zinc-700 text-xs text-white focus:outline-none focus:border-amber-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-zinc-400 mb-1">No. Telp / WhatsApp Penerima</label>
+                    <input
+                      type="text"
+                      value={configForm.gift_phone || ''}
+                      onChange={(e) => setConfigForm({ ...configForm, gift_phone: e.target.value })}
+                      placeholder="0812-3456-7890"
+                      className="w-full px-3 py-2 rounded-xl bg-black/60 border border-zinc-700 text-xs text-white focus:outline-none focus:border-amber-400"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Love Story Milestones */}
+              <div className="p-5 rounded-2xl bg-black/30 border border-amber-500/20 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-amber-300">
+                    <Heart className="w-4 h-4" />
+                    <h4 className="text-xs font-bold uppercase tracking-wider">
+                      Kisah Perjalanan Cinta (Love Story Milestones)
+                    </h4>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAddMilestone}
+                    className="px-3 py-1.5 rounded-lg bg-amber-400/20 hover:bg-amber-400/30 border border-amber-500/30 text-amber-300 text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Tambah Momen Kisah</span>
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  {(configForm.love_story || []).map((ms, idx) => (
+                    <div
+                      key={idx}
+                      className="p-4 rounded-xl bg-black/50 border border-zinc-800 space-y-3 relative group"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-amber-200">
+                          Momen #{idx + 1}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveMilestone(idx)}
+                          className="p-1 rounded-lg bg-red-900/30 hover:bg-red-900/60 text-red-300 transition-colors cursor-pointer"
+                          title="Hapus Momen"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                        <div className="sm:col-span-1">
+                          <label className="block text-[10px] text-zinc-500 mb-0.5">Tahun</label>
+                          <input
+                            type="text"
+                            value={ms.year}
+                            onChange={(e) => handleUpdateMilestone(idx, 'year', e.target.value)}
+                            placeholder="2021"
+                            className="w-full px-2.5 py-1.5 rounded-lg bg-black/60 border border-zinc-700 text-xs text-white font-mono"
+                          />
+                        </div>
+                        <div className="sm:col-span-3">
+                          <label className="block text-[10px] text-zinc-500 mb-0.5">Judul Momen</label>
+                          <input
+                            type="text"
+                            value={ms.title}
+                            onChange={(e) => handleUpdateMilestone(idx, 'title', e.target.value)}
+                            placeholder="Awal Pertemuan / The Proposal"
+                            className="w-full px-2.5 py-1.5 rounded-lg bg-black/60 border border-zinc-700 text-xs text-white"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] text-zinc-500 mb-0.5">Deskripsi Kisah Cerita</label>
+                        <textarea
+                          rows={2}
+                          value={ms.description}
+                          onChange={(e) => handleUpdateMilestone(idx, 'description', e.target.value)}
+                          placeholder="Ceritakan momen indah Anda berdua di sini..."
+                          className="w-full px-2.5 py-1.5 rounded-lg bg-black/60 border border-zinc-700 text-xs text-white"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                  {(!configForm.love_story || configForm.love_story.length === 0) && (
+                    <p className="text-xs text-zinc-500 italic">Belum ada momen kisah cinta yang dibuat. Klik "+ Tambah Momen Kisah" untuk mulai membuat.</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Bottom Action Button */}
+              <div className="flex justify-end pt-2">
                 <button
                   type="submit"
                   disabled={configSaving}
-                  className="px-6 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-black font-semibold text-xs uppercase tracking-wider flex items-center gap-2 transition-all cursor-pointer"
+                  className="px-6 py-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-black font-semibold text-xs uppercase tracking-wider flex items-center gap-2 transition-all cursor-pointer shadow-lg"
                 >
                   {configSaving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                  <span>Simpan Perubahan Database</span>
+                  <span>Simpan Perubahan ke Database Backend</span>
                 </button>
               </div>
             </form>
@@ -1034,6 +1470,143 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 </button>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* TAB 7: SECURITY & PASSWORD CHANGE */}
+        {activeTab === 'security' && (
+          <div className="glass-gold rounded-3xl p-6 sm:p-8 border border-amber-500/20 max-w-xl mx-auto space-y-6">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-300">
+                <KeyRound className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-serif-cormorant text-2xl font-semibold text-amber-100">
+                  Keamanan & Ganti Password Admin
+                </h3>
+                <p className="text-xs text-zinc-400">
+                  Perbarui username atau password login admin ke dalam database terenkripsi (Bcrypt)
+                </p>
+              </div>
+            </div>
+
+            {passwordSuccess && (
+              <div className="p-3.5 rounded-xl bg-emerald-950/40 border border-emerald-500/40 text-emerald-200 text-xs flex items-center gap-2">
+                <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>{passwordSuccess}</span>
+              </div>
+            )}
+
+            {passwordError && (
+              <div className="p-3.5 rounded-xl bg-red-950/40 border border-red-500/40 text-red-200 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+                <span>{passwordError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleChangePassword} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-amber-200/80 mb-1.5">
+                  Username Admin Baru (Opsional)
+                </label>
+                <input
+                  type="text"
+                  value={newUsernameInput}
+                  onChange={(e) => setNewUsernameInput(e.target.value)}
+                  placeholder={adminUser.username}
+                  className="w-full px-4 py-2.5 rounded-xl bg-black/60 border border-amber-500/30 text-white placeholder-zinc-500 text-xs focus:outline-none focus:border-amber-400"
+                />
+                <span className="text-[10px] text-zinc-500 mt-1 block">
+                  Biarkan kosong jika tidak ingin mengubah username (username saat ini: <strong>{adminUser.username}</strong>)
+                </span>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-amber-200/80 mb-1.5">
+                  Password Lama
+                </label>
+                <div className="relative">
+                  <input
+                    type={showOldPassword ? 'text' : 'password'}
+                    value={oldPasswordInput}
+                    onChange={(e) => setOldPasswordInput(e.target.value)}
+                    placeholder="Masukkan password saat ini"
+                    className="w-full px-4 py-2.5 rounded-xl bg-black/60 border border-amber-500/30 text-white placeholder-zinc-500 text-xs focus:outline-none focus:border-amber-400 pr-10"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowOldPassword(!showOldPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-amber-200 cursor-pointer"
+                  >
+                    {showOldPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-amber-200/80 mb-1.5">
+                  Password Baru
+                </label>
+                <div className="relative">
+                  <input
+                    type={showNewPassword ? 'text' : 'password'}
+                    value={newPasswordInput}
+                    onChange={(e) => setNewPasswordInput(e.target.value)}
+                    placeholder="Minimal 6 karakter"
+                    className="w-full px-4 py-2.5 rounded-xl bg-black/60 border border-amber-500/30 text-white placeholder-zinc-500 text-xs focus:outline-none focus:border-amber-400 pr-10"
+                    required
+                    minLength={6}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-amber-200 cursor-pointer"
+                  >
+                    {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-amber-200/80 mb-1.5">
+                  Ulangi Password Baru
+                </label>
+                <input
+                  type={showNewPassword ? 'text' : 'password'}
+                  value={confirmPasswordInput}
+                  onChange={(e) => setConfirmPasswordInput(e.target.value)}
+                  placeholder="Ketik ulang password baru"
+                  className="w-full px-4 py-2.5 rounded-xl bg-black/60 border border-amber-500/30 text-white placeholder-zinc-500 text-xs focus:outline-none focus:border-amber-400"
+                  required
+                />
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-200/80 space-y-1">
+                <p className="font-semibold text-amber-200 flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  <span>Keamanan Kredensial Database</span>
+                </p>
+                <p>
+                  Password disimpan menggunakan algoritma Bcrypt (salted hash) di database backend. Password Anda tidak akan pernah bocor ke publik atau ditampilkan saat terjadi kesalahan login.
+                </p>
+              </div>
+
+              <button
+                type="submit"
+                disabled={passwordLoading}
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 text-black font-semibold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(212,175,55,0.4)] transition-all cursor-pointer disabled:opacity-50"
+              >
+                {passwordLoading ? (
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                ) : (
+                  <>
+                    <KeyRound className="w-4 h-4" />
+                    <span>Simpan Kredensial Baru ke Database</span>
+                  </>
+                )}
+              </button>
+            </form>
           </div>
         )}
       </main>

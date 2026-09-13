@@ -51,6 +51,15 @@ export function saveDatabase() {
 }
 
 async function initSchema(db: Database) {
+  // Helper to add column if not exists
+  const addColumnIfNotExists = (table: string, column: string, colType: string) => {
+    try {
+      db.run(`ALTER TABLE ${table} ADD COLUMN ${column} ${colType};`);
+    } catch {
+      // Column already exists
+    }
+  };
+
   // Create Admins table
   db.run(`
     CREATE TABLE IF NOT EXISTS admins (
@@ -65,14 +74,17 @@ async function initSchema(db: Database) {
   db.run(`
     CREATE TABLE IF NOT EXISTS wedding_config (
       id TEXT PRIMARY KEY,
+      cover_title TEXT DEFAULT 'The Wedding Of',
       groom_name TEXT NOT NULL,
       groom_full_name TEXT NOT NULL,
       groom_parents TEXT NOT NULL,
       groom_instagram TEXT,
+      groom_photo TEXT,
       bride_name TEXT NOT NULL,
       bride_full_name TEXT NOT NULL,
       bride_parents TEXT NOT NULL,
       bride_instagram TEXT,
+      bride_photo TEXT,
       wedding_date TEXT NOT NULL,
       akad_time TEXT NOT NULL,
       akad_location TEXT NOT NULL,
@@ -86,9 +98,22 @@ async function initSchema(db: Database) {
       quote_source TEXT NOT NULL,
       audio_url TEXT,
       bank_accounts_json TEXT,
+      gift_address TEXT,
+      gift_receiver TEXT,
+      gift_phone TEXT,
+      love_story_json TEXT,
       updated_at TEXT NOT NULL
     );
   `);
+
+  // Apply migrations to ensure all columns exist on existing databases
+  addColumnIfNotExists('wedding_config', 'cover_title', 'TEXT');
+  addColumnIfNotExists('wedding_config', 'groom_photo', 'TEXT');
+  addColumnIfNotExists('wedding_config', 'bride_photo', 'TEXT');
+  addColumnIfNotExists('wedding_config', 'gift_address', 'TEXT');
+  addColumnIfNotExists('wedding_config', 'gift_receiver', 'TEXT');
+  addColumnIfNotExists('wedding_config', 'gift_phone', 'TEXT');
+  addColumnIfNotExists('wedding_config', 'love_story_json', 'TEXT');
 
   // Create RSVP table
   db.run(`
@@ -150,33 +175,60 @@ async function initSchema(db: Database) {
   // Seed default Wedding Config if not exists
   const checkConfig = db.exec("SELECT COUNT(*) as count FROM wedding_config");
   const configCount = checkConfig[0]?.values[0]?.[0] || 0;
-  if (configCount === 0) {
-    const bankAccounts = JSON.stringify([
-      { bank: 'BCA', accountNumber: '8830-192-881', accountName: 'Dimas Pratama' },
-      { bank: 'Mandiri', accountNumber: '137-00-198231-9', accountName: 'Althea Maharani' }
-    ]);
+  const defaultLoveStory = JSON.stringify([
+    {
+      year: '2021',
+      title: 'Awal Pertemuan',
+      description: 'Takdir mempertemukan kami di sebuah sudut perpustakaan kota tua. Percakapan santai tentang karya seni dan arsitektur menjadi gerbang benih-benih cinta.'
+    },
+    {
+      year: '2023',
+      title: 'Menjalin Komitmen',
+      description: 'Dua kepribadian, dua keluarga, bersatu dalam saling pengertian. Kami belajar bertumbuh bersama, saling melengkapi suka dan duka.'
+    },
+    {
+      year: '2025',
+      title: 'Untaian Janji / The Proposal',
+      description: 'Di bawah taburan bintang di tepi pantai Bali, cincin tanda kesetiaan disematkan. Dengan mata berbinar bahagia, sebuah kata "Yes" mengunci takdir kami.'
+    },
+    {
+      year: '2026',
+      title: 'Menuju Hari Abadi',
+      description: 'Kini langkah kami bermuara pada janji suci pernikahan. Dengan ridho keluarga dan doa sahabat, kami memulai babak terindah dalam hidup.'
+    }
+  ]);
 
+  const defaultBankAccounts = JSON.stringify([
+    { bank: 'BCA', accountNumber: '8830-192-881', accountName: 'Dimas Pratama' },
+    { bank: 'Mandiri', accountNumber: '137-00-198231-9', accountName: 'Althea Maharani' }
+  ]);
+
+  if (configCount === 0) {
     db.run(`
       INSERT INTO wedding_config (
         id,
-        groom_name, groom_full_name, groom_parents, groom_instagram,
-        bride_name, bride_full_name, bride_parents, bride_instagram,
+        cover_title,
+        groom_name, groom_full_name, groom_parents, groom_instagram, groom_photo,
+        bride_name, bride_full_name, bride_parents, bride_instagram, bride_photo,
         wedding_date,
         akad_time, akad_location, akad_address, akad_map_url,
         resepsi_time, resepsi_location, resepsi_address, resepsi_map_url,
         quote, quote_source,
-        audio_url, bank_accounts_json, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        audio_url, bank_accounts_json, gift_address, gift_receiver, gift_phone, love_story_json, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       'default_config',
+      'The Wedding Of',
       'Dimas',
       'Dimas Arya Pratama, S.T.',
       'Putra pertama dari Bpk. Bambang Sutrisno & Ibu Sri Wahyuni',
       '@dimas_aryap',
+      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=500&q=80',
       'Althea',
       'Althea Maharani Putri, M.Ds.',
       'Putri kedua dari Bpk. Hendra Gunawan & Ibu Rina Marlina',
       '@altheamhrn',
+      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=500&q=80',
       '2026-10-18T09:00:00+07:00',
       '08:00 - 10:00 WIB',
       'Glass House Chapel, The Heritage Grand Ballroom',
@@ -189,9 +241,26 @@ async function initSchema(db: Database) {
       'Dan di antara tanda-tanda (kebesaran)-Nya ialah Dia menciptakan pasangan-pasangan untukmu dari jenismu sendiri, agar kamu cenderung dan merasa tenteram kepadanya, dan Dia menjadikan di antaramu rasa kasih dan sayang.',
       'QS. Ar-Rum: 21',
       'https://cdn.freesound.org/previews/518/518295_7859343-lq.mp3',
-      bankAccounts,
+      defaultBankAccounts,
+      'Jl. Sunset Boulevard No. 88, Menteng, Jakarta Pusat 10310',
+      'Dimas & Althea',
+      '0812-3456-7890',
+      defaultLoveStory,
       new Date().toISOString()
     ]);
+  } else {
+    // Populate any NULL values in existing config
+    db.run(`
+      UPDATE wedding_config SET
+        cover_title = COALESCE(cover_title, 'The Wedding Of'),
+        groom_photo = COALESCE(groom_photo, 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=500&q=80'),
+        bride_photo = COALESCE(bride_photo, 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=500&q=80'),
+        gift_address = COALESCE(gift_address, 'Jl. Sunset Boulevard No. 88, Menteng, Jakarta Pusat 10310'),
+        gift_receiver = COALESCE(gift_receiver, 'Dimas & Althea'),
+        gift_phone = COALESCE(gift_phone, '0812-3456-7890'),
+        love_story_json = COALESCE(love_story_json, ?)
+      WHERE id = 'default_config'
+    `, [defaultLoveStory]);
   }
 
   // Seed default wishes if empty

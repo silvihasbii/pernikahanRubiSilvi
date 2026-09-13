@@ -214,7 +214,7 @@ export default function App() {
           <CoupleSection config={config} />
 
           {/* Love Story Timeline Section */}
-          <StorySection />
+          <StorySection config={config} />
 
           {/* 3D Pavilion & Event Schedule Section */}
           <EventSection config={config} />
@@ -246,7 +246,7 @@ export default function App() {
           />
 
           {/* Digital Gift & Amplop Digital Section */}
-          <GiftSection bankAccounts={config?.bank_accounts || []} />
+          <GiftSection bankAccounts={config?.bank_accounts || []} config={config} />
 
           {/* Closing Footer */}
           <Footer config={config} />

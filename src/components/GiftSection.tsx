@@ -1,19 +1,27 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { Gift, Copy, Check, CreditCard, Heart } from 'lucide-react';
-import { BankAccount } from '../types';
+import { Gift, Copy, Check, CreditCard, MapPin, Package } from 'lucide-react';
+import { BankAccount, WeddingConfig } from '../types';
 
 interface GiftSectionProps {
   bankAccounts: BankAccount[];
+  config?: WeddingConfig | null;
 }
 
-export const GiftSection: React.FC<GiftSectionProps> = ({ bankAccounts }) => {
+export const GiftSection: React.FC<GiftSectionProps> = ({ bankAccounts, config }) => {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [copiedAddress, setCopiedAddress] = useState(false);
 
   const copyToClipboard = (text: string, index: number) => {
     navigator.clipboard.writeText(text);
     setCopiedIndex(index);
     setTimeout(() => setCopiedIndex(null), 2500);
+  };
+
+  const copyAddressToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedAddress(true);
+    setTimeout(() => setCopiedAddress(false), 2500);
   };
 
   const defaultAccounts: BankAccount[] = bankAccounts?.length
@@ -22,6 +30,10 @@ export const GiftSection: React.FC<GiftSectionProps> = ({ bankAccounts }) => {
         { bank: 'BCA', accountNumber: '8830-192-881', accountName: 'Dimas Pratama' },
         { bank: 'Mandiri', accountNumber: '137-00-198231-9', accountName: 'Althea Maharani' },
       ];
+
+  const giftAddress = config?.gift_address || 'Jl. Sunset Boulevard No. 88, Menteng, Jakarta Pusat 10310';
+  const giftReceiver = config?.gift_receiver || 'Dimas & Althea';
+  const giftPhone = config?.gift_phone || '0812-3456-7890';
 
   return (
     <section id="gift" className="relative py-20 px-4">
@@ -43,10 +55,11 @@ export const GiftSection: React.FC<GiftSectionProps> = ({ bankAccounts }) => {
         </h2>
 
         <p className="text-sm text-zinc-400 max-w-md mx-auto mb-10 font-light leading-relaxed">
-          Doa restu Anda merupakan karunia terindah bagi kami. Namun jika ingin memberikan tanda kasih secara digital, Anda dapat melalui rekening berikut:
+          Doa restu Anda merupakan karunia terindah bagi kami. Namun jika ingin memberikan tanda kasih secara digital atau mengirim kado fisik, Anda dapat melalui sarana berikut:
         </p>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+        {/* Bank & E-Wallet Accounts */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
           {defaultAccounts.map((acc, idx) => (
             <motion.div
               key={idx}
@@ -93,6 +106,62 @@ export const GiftSection: React.FC<GiftSectionProps> = ({ bankAccounts }) => {
             </motion.div>
           ))}
         </div>
+
+        {/* Physical Gift Delivery Address */}
+        {giftAddress && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+            className="glass-gold rounded-3xl p-6 sm:p-8 border border-amber-500/25 text-left relative shadow-xl"
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-9 h-9 rounded-full bg-amber-500/20 border border-amber-500/30 flex items-center justify-center">
+                <Package className="w-4 h-4 text-amber-400" />
+              </div>
+              <div>
+                <h3 className="text-base font-serif-cormorant font-bold text-amber-100">
+                  Kirim Kado / Bingkisan Fisik
+                </h3>
+                <p className="text-xs text-zinc-400">
+                  Untuk pengiriman kado atau bingkisan melalui ekspedisi / kurir
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-black/40 rounded-2xl p-4 sm:p-5 border border-amber-500/20 mb-4 space-y-2">
+              <div className="flex items-start gap-2">
+                <MapPin className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
+                <p className="text-xs sm:text-sm text-zinc-200 leading-relaxed">
+                  {giftAddress}
+                </p>
+              </div>
+              <div className="pt-2 border-t border-white/10 flex flex-wrap gap-x-6 gap-y-1 text-xs text-zinc-300">
+                <span>Penerima: <strong className="text-amber-200">{giftReceiver}</strong></span>
+                {giftPhone && <span>No. Telp / WA: <strong className="text-amber-200">{giftPhone}</strong></span>}
+              </div>
+            </div>
+
+            <button
+              id="btn-copy-address"
+              onClick={() => copyAddressToClipboard(`${giftAddress}\nPenerima: ${giftReceiver} (${giftPhone})`)}
+              className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-amber-400/10 hover:bg-amber-400/20 border border-amber-500/30 text-amber-300 text-xs font-semibold uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer"
+            >
+              {copiedAddress ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="text-emerald-300">Alamat Lengkap Berhasil Disalin!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>Salin Alamat Pengiriman</span>
+                </>
+              )}
+            </button>
+          </motion.div>
+        )}
       </motion.div>
     </section>
   );

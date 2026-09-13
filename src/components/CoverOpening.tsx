@@ -49,7 +49,7 @@ export const CoverOpening: React.FC<CoverOpeningProps> = ({
           {/* Top Crown / Monogram */}
           <div className="flex items-center gap-2 text-amber-300 text-xs font-medium tracking-[0.3em] uppercase mb-4">
             <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-            <span>The Wedding Of</span>
+            <span>{config?.cover_title || 'The Wedding Of'}</span>
             <Sparkles className="w-3.5 h-3.5 text-amber-400" />
           </div>
 

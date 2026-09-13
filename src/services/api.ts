@@ -14,14 +14,17 @@ const LOCAL_STORAGE_PREFIX = 'wedding_app_';
 // Initial fallback mock data for when static hosting (Netlify/Vercel) has no running Node.js backend
 const DEFAULT_CONFIG: WeddingConfig = {
   id: 'default_config',
+  cover_title: 'The Wedding Of',
   groom_name: 'Dimas',
   groom_full_name: 'Dimas Arya Pratama, S.T.',
   groom_parents: 'Putra pertama dari Bpk. Bambang Sutrisno & Ibu Sri Wahyuni',
   groom_instagram: '@dimas_aryap',
+  groom_photo: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=500&q=80',
   bride_name: 'Althea',
   bride_full_name: 'Althea Maharani Putri, M.Ds.',
   bride_parents: 'Putri kedua dari Bpk. Hendra Gunawan & Ibu Rina Marlina',
   bride_instagram: '@altheamhrn',
+  bride_photo: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=500&q=80',
   wedding_date: '2026-10-18T08:00:00+07:00',
   akad_time: '08:00 - 10:00 WIB',
   akad_location: 'Glass House Chapel, The Heritage Grand Ballroom',
@@ -38,6 +41,31 @@ const DEFAULT_CONFIG: WeddingConfig = {
   bank_accounts: [
     { bank: 'BCA', accountNumber: '8830-192-881', accountName: 'Dimas Pratama' },
     { bank: 'Mandiri', accountNumber: '137-00-198231-9', accountName: 'Althea Maharani' },
+  ],
+  gift_address: 'Jl. Sunset Boulevard No. 88, Menteng, Jakarta Pusat 10310',
+  gift_receiver: 'Dimas & Althea',
+  gift_phone: '0812-3456-7890',
+  love_story: [
+    {
+      year: '2021',
+      title: 'Awal Pertemuan',
+      description: 'Takdir mempertemukan kami di sebuah sudut perpustakaan kota tua. Percakapan santai tentang karya seni dan arsitektur menjadi gerbang benih-benih cinta.',
+    },
+    {
+      year: '2023',
+      title: 'Menjalin Komitmen',
+      description: 'Dua kepribadian, dua keluarga, bersatu dalam saling pengertian. Kami belajar bertumbuh bersama, saling melengkapi suka dan duka.',
+    },
+    {
+      year: '2025',
+      title: 'Untaian Janji / The Proposal',
+      description: 'Di bawah taburan bintang di tepi pantai Bali, cincin tanda kesetiaan disematkan. Dengan mata berbinar bahagia, sebuah kata "Yes" mengunci takdir kami.',
+    },
+    {
+      year: '2026',
+      title: 'Menuju Hari Abadi',
+      description: 'Kini langkah kami bermuara pada janji suci pernikahan. Dengan ridho keluarga dan doa sahabat, kami memulai babak terindah dalam hidup.',
+    },
   ],
 };
 
@@ -493,14 +521,27 @@ export async function adminLogin(username: string, password: string): Promise<{ 
       setAdminToken(data.token);
       return data;
     }
-  } catch {
-    // Fallback below
+    if (isJson && !data?.success) {
+      // Backend returned authentication error - never fall through or leak credentials!
+      throw new Error(data.error || 'Username atau password yang Anda masukkan salah. Silakan coba lagi.');
+    }
+  } catch (err: any) {
+    // If it's a specific auth error from the backend, rethrow it directly
+    if (err.message && !err.message.includes('fetch') && !err.message.includes('Network') && !err.message.includes('Failed to fetch')) {
+      throw err;
+    }
+    // Only continue to local fallback if network/server is totally unreachable (e.g. static hosting)
   }
 
   // Fallback credentials for Netlify / Vercel static mode
+  const creds = getLocal<{ username: string; password: string }>('admin_creds', {
+    username: 'admin',
+    password: 'weddingAdmin2026!',
+  });
+
   if (
-    username.trim().toLowerCase() === 'admin' &&
-    (password === 'weddingAdmin2026!' || password === 'admin' || password === 'admin123')
+    username.trim().toLowerCase() === creds.username.toLowerCase() &&
+    (password === creds.password || (creds.password === 'weddingAdmin2026!' && (password === 'admin' || password === 'admin123')))
   ) {
     const localToken = 'local_static_admin_token_' + Date.now();
     setAdminToken(localToken);
@@ -508,12 +549,72 @@ export async function adminLogin(username: string, password: string): Promise<{ 
       token: localToken,
       admin: {
         id: 'admin_local_master',
-        username: 'admin',
+        username: creds.username,
       },
     };
   }
 
-  throw new Error('Kredensial tidak valid. Gunakan username: admin dan password: weddingAdmin2026!');
+  throw new Error('Username atau password yang Anda masukkan salah. Silakan periksa kembali.');
+}
+
+export async function changeAdminPassword(
+  oldPassword: string,
+  newPassword: string,
+  newUsername?: string
+): Promise<{ success: boolean; message: string; admin?: AdminUser }> {
+  try {
+    const res = await fetch('/api/auth/change-password', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify({ oldPassword, newPassword, newUsername }),
+    });
+    const { isJson, data } = await parseResponseJson(res);
+    if (isJson && data?.success) {
+      if (data.token) setAdminToken(data.token);
+      return data;
+    }
+    if (isJson && !data?.success) {
+      throw new Error(data.error || 'Gagal mengubah password admin di server.');
+    }
+  } catch (err: any) {
+    if (err.message && !err.message.includes('fetch') && !err.message.includes('Network') && !err.message.includes('Failed to fetch')) {
+      throw err;
+    }
+    // Fallback for static hosting
+  }
+
+  // Fallback for static hosting (Netlify/Vercel)
+  const creds = getLocal<{ username: string; password: string }>('admin_creds', {
+    username: 'admin',
+    password: 'weddingAdmin2026!',
+  });
+
+  if (oldPassword !== creds.password && !(creds.password === 'weddingAdmin2026!' && (oldPassword === 'admin' || oldPassword === 'admin123'))) {
+    throw new Error('Password lama yang Anda masukkan tidak sesuai.');
+  }
+
+  if (!newPassword || newPassword.length < 6) {
+    throw new Error('Password baru minimal 6 karakter.');
+  }
+
+  const updatedUsername = newUsername && newUsername.trim() ? newUsername.trim() : creds.username;
+  const updatedCreds = {
+    username: updatedUsername,
+    password: newPassword,
+  };
+  setLocal('admin_creds', updatedCreds);
+
+  return {
+    success: true,
+    message: 'Password dan kredensial admin berhasil diperbarui di database.',
+    admin: {
+      id: 'admin_local_master',
+      username: updatedUsername,
+    },
+  };
 }
 
 export async function adminVerifyToken(): Promise<AdminUser> {
