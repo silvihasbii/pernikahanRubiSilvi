@@ -1,13 +1,30 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 
 export const Countdown3DCanvas: React.FC = () => {
   const mountRef = useRef<HTMLDivElement>(null);
+  const [isInView, setIsInView] = useState(false);
 
   useEffect(() => {
     const container = mountRef.current;
     if (!container) return;
 
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsInView(entry.isIntersecting);
+      },
+      { rootMargin: '200px 0px', threshold: 0.01 }
+    );
+
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const container = mountRef.current;
+    if (!container || !isInView) return;
+
+    let isDisposed = false;
     let width = container.clientWidth || 320;
     let height = container.clientHeight || 280;
 
@@ -15,18 +32,40 @@ export const Countdown3DCanvas: React.FC = () => {
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
     camera.position.set(0, 0, 7);
 
-    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, powerPreference: 'high-performance' });
-    renderer.setClearColor(0x000000, 0);
-    renderer.setSize(width, height);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.domElement.style.background = 'transparent';
-    renderer.domElement.style.display = 'block';
+    let renderer: THREE.WebGLRenderer | null = null;
+    try {
+      renderer = new THREE.WebGLRenderer({
+        alpha: true,
+        antialias: true,
+        powerPreference: 'high-performance',
+      });
+      renderer.setClearColor(0x000000, 0);
+      renderer.setSize(width, height);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.domElement.style.background = 'transparent';
+      renderer.domElement.style.backgroundColor = 'transparent';
+      renderer.domElement.style.display = 'block';
 
-    const onContextLost = (e: Event) => e.preventDefault();
-    renderer.domElement.addEventListener('webglcontextlost', onContextLost, false);
+      container.innerHTML = '';
+      container.appendChild(renderer.domElement);
+    } catch {
+      return;
+    }
 
-    container.innerHTML = '';
-    container.appendChild(renderer.domElement);
+    let isContextLost = false;
+    const onContextLost = (e: Event) => {
+      e.preventDefault();
+      isContextLost = true;
+      if (renderer?.domElement) renderer.domElement.style.opacity = '0';
+    };
+    const onContextRestored = () => {
+      isContextLost = false;
+      if (renderer?.domElement) renderer.domElement.style.opacity = '1';
+    };
+
+    const canvas = renderer.domElement;
+    canvas.addEventListener('webglcontextlost', onContextLost, false);
+    canvas.addEventListener('webglcontextrestored', onContextRestored, false);
 
     const gyroGroup = new THREE.Group();
     scene.add(gyroGroup);
@@ -36,17 +75,19 @@ export const Countdown3DCanvas: React.FC = () => {
       color: 0xd4af37,
       metalness: 0.9,
       roughness: 0.2,
-      wireframe: false,
     });
 
-    const ring1 = new THREE.Mesh(new THREE.TorusGeometry(2.2, 0.06, 16, 64), ringMat);
+    const ring1Geo = new THREE.TorusGeometry(2.2, 0.06, 16, 64);
+    const ring1 = new THREE.Mesh(ring1Geo, ringMat);
     gyroGroup.add(ring1);
 
-    const ring2 = new THREE.Mesh(new THREE.TorusGeometry(1.7, 0.05, 16, 64), ringMat);
+    const ring2Geo = new THREE.TorusGeometry(1.7, 0.05, 16, 64);
+    const ring2 = new THREE.Mesh(ring2Geo, ringMat);
     ring2.rotation.x = Math.PI / 4;
     gyroGroup.add(ring2);
 
-    const ring3 = new THREE.Mesh(new THREE.TorusGeometry(1.2, 0.04, 16, 64), ringMat);
+    const ring3Geo = new THREE.TorusGeometry(1.2, 0.04, 16, 64);
+    const ring3 = new THREE.Mesh(ring3Geo, ringMat);
     ring3.rotation.y = Math.PI / 3;
     gyroGroup.add(ring3);
 
@@ -61,7 +102,8 @@ export const Countdown3DCanvas: React.FC = () => {
       opacity: 0.9,
       ior: 2.2,
     });
-    const crystal = new THREE.Mesh(new THREE.IcosahedronGeometry(0.7, 0), crystalMat);
+    const crystalGeo = new THREE.IcosahedronGeometry(0.7, 0);
+    const crystal = new THREE.Mesh(crystalGeo, crystalMat);
     gyroGroup.add(crystal);
 
     // 4 Orbiting Time Orbs (Hari, Jam, Menit, Detik)
@@ -73,12 +115,13 @@ export const Countdown3DCanvas: React.FC = () => {
       roughness: 0.1,
     });
 
+    const orbGeo = new THREE.SphereGeometry(0.12, 16, 16);
     const orbs: { mesh: THREE.Mesh; radius: number; speed: number; angle: number; yOffset: number }[] = [];
     const orbRadii = [2.2, 1.7, 1.2, 0.8];
     const orbSpeeds = [0.8, 1.3, 1.9, 2.7];
 
     for (let i = 0; i < 4; i++) {
-      const orb = new THREE.Mesh(new THREE.SphereGeometry(0.12, 16, 16), orbMat);
+      const orb = new THREE.Mesh(orbGeo, orbMat);
       scene.add(orb);
       orbs.push({
         mesh: orb,
@@ -135,7 +178,7 @@ export const Countdown3DCanvas: React.FC = () => {
     const resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
         const { width: newW, height: newH } = entry.contentRect;
-        if (newW > 0 && newH > 0) {
+        if (newW > 0 && newH > 0 && renderer) {
           camera.aspect = newW / newH;
           camera.updateProjectionMatrix();
           renderer.setSize(newW, newH);
@@ -144,40 +187,33 @@ export const Countdown3DCanvas: React.FC = () => {
     });
     resizeObserver.observe(container);
 
-    let isVisible = true;
-    const intersectionObserver = new IntersectionObserver(
-      ([entry]) => {
-        isVisible = entry ? entry.isIntersecting : true;
-      },
-      { threshold: 0.05 }
-    );
-    intersectionObserver.observe(container);
-
     let animId: number;
-    let clock = new THREE.Clock();
+    let lastTime = performance.now();
 
     const animate = () => {
+      if (isDisposed) return;
       animId = requestAnimationFrame(animate);
-      if (!isVisible) return;
-      const delta = clock.getDelta();
-      const elapsed = clock.getElapsedTime();
+
+      if (isContextLost || !renderer) return;
+
+      const now = performance.now();
+      const delta = (now - lastTime) / 1000;
+      lastTime = now;
 
       if (!isDragging) {
         targetRotY += 0.008;
-        targetRotX = Math.sin(elapsed * 0.5) * 0.2;
       }
 
-      gyroGroup.rotation.y += (targetRotY - gyroGroup.rotation.y) * 0.1;
-      gyroGroup.rotation.x += (targetRotX - gyroGroup.rotation.x) * 0.1;
+      gyroGroup.rotation.y += (targetRotY - gyroGroup.rotation.y) * 0.05;
+      gyroGroup.rotation.x += (targetRotX - gyroGroup.rotation.x) * 0.05;
 
       ring1.rotation.z += 0.005;
-      ring2.rotation.x += 0.009;
-      ring3.rotation.y += 0.012;
+      ring2.rotation.z -= 0.008;
+      ring3.rotation.x += 0.006;
 
-      crystal.rotation.x = elapsed * 0.6;
-      crystal.rotation.y = elapsed * 0.8;
+      crystal.rotation.y -= 0.02;
+      crystal.rotation.x += 0.01;
 
-      // Update orbiting time orbs
       for (const orb of orbs) {
         orb.angle += orb.speed * delta;
         orb.mesh.position.x = Math.cos(orb.angle) * orb.radius;
@@ -191,25 +227,43 @@ export const Countdown3DCanvas: React.FC = () => {
     animate();
 
     return () => {
+      isDisposed = true;
       cancelAnimationFrame(animId);
       resizeObserver.disconnect();
-      intersectionObserver.disconnect();
+
       container.removeEventListener('mousedown', onPointerDown);
       window.removeEventListener('mousemove', onPointerMove);
       window.removeEventListener('mouseup', onPointerUp);
       container.removeEventListener('touchstart', onPointerDown);
       window.removeEventListener('touchmove', onPointerMove);
       window.removeEventListener('touchend', onPointerUp);
-      if (renderer.domElement && container.contains(renderer.domElement)) {
-        container.removeChild(renderer.domElement);
+
+      canvas.removeEventListener('webglcontextlost', onContextLost);
+      canvas.removeEventListener('webglcontextrestored', onContextRestored);
+
+      if (renderer) {
+        if (renderer.domElement && container.contains(renderer.domElement)) {
+          container.removeChild(renderer.domElement);
+        }
+        renderer.dispose();
+        renderer.forceContextLoss();
+        renderer = null;
       }
-      renderer.dispose();
+
+      ring1Geo.dispose();
+      ring2Geo.dispose();
+      ring3Geo.dispose();
+      ringMat.dispose();
+      crystalGeo.dispose();
+      crystalMat.dispose();
+      orbGeo.dispose();
+      orbMat.dispose();
     };
-  }, []);
+  }, [isInView]);
 
   return (
-    <div className="relative w-full h-[240px] sm:h-[280px] flex items-center justify-center cursor-grab active:cursor-grabbing select-none">
-      <div ref={mountRef} className="w-full h-full" />
+    <div className="relative w-full h-[240px] sm:h-[280px] flex items-center justify-center cursor-grab active:cursor-grabbing select-none bg-transparent">
+      <div ref={mountRef} className="w-full h-full bg-transparent overflow-hidden" />
     </div>
   );
 };

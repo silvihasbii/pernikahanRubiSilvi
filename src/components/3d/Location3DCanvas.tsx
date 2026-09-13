@@ -1,13 +1,30 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 
 export const Location3DCanvas: React.FC = () => {
   const mountRef = useRef<HTMLDivElement>(null);
+  const [isInView, setIsInView] = useState(false);
 
   useEffect(() => {
     const container = mountRef.current;
     if (!container) return;
 
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsInView(entry.isIntersecting);
+      },
+      { rootMargin: '200px 0px', threshold: 0.01 }
+    );
+
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const container = mountRef.current;
+    if (!container || !isInView) return;
+
+    let isDisposed = false;
     let width = container.clientWidth || 320;
     let height = container.clientHeight || 260;
 
@@ -16,18 +33,40 @@ export const Location3DCanvas: React.FC = () => {
     camera.position.set(0, 2.5, 6.5);
     camera.lookAt(0, 0, 0);
 
-    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, powerPreference: 'high-performance' });
-    renderer.setClearColor(0x000000, 0);
-    renderer.setSize(width, height);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.domElement.style.background = 'transparent';
-    renderer.domElement.style.display = 'block';
+    let renderer: THREE.WebGLRenderer | null = null;
+    try {
+      renderer = new THREE.WebGLRenderer({
+        alpha: true,
+        antialias: true,
+        powerPreference: 'high-performance',
+      });
+      renderer.setClearColor(0x000000, 0);
+      renderer.setSize(width, height);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.domElement.style.background = 'transparent';
+      renderer.domElement.style.backgroundColor = 'transparent';
+      renderer.domElement.style.display = 'block';
 
-    const onContextLost = (e: Event) => e.preventDefault();
-    renderer.domElement.addEventListener('webglcontextlost', onContextLost, false);
+      container.innerHTML = '';
+      container.appendChild(renderer.domElement);
+    } catch {
+      return;
+    }
 
-    container.innerHTML = '';
-    container.appendChild(renderer.domElement);
+    let isContextLost = false;
+    const onContextLost = (e: Event) => {
+      e.preventDefault();
+      isContextLost = true;
+      if (renderer?.domElement) renderer.domElement.style.opacity = '0';
+    };
+    const onContextRestored = () => {
+      isContextLost = false;
+      if (renderer?.domElement) renderer.domElement.style.opacity = '1';
+    };
+
+    const canvas = renderer.domElement;
+    canvas.addEventListener('webglcontextlost', onContextLost, false);
+    canvas.addEventListener('webglcontextrestored', onContextRestored, false);
 
     const venueGroup = new THREE.Group();
     scene.add(venueGroup);
@@ -44,11 +83,13 @@ export const Location3DCanvas: React.FC = () => {
       roughness: 0.2,
     });
 
-    const baseMesh = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.6, 0.2, 32), baseMat);
+    const baseGeo = new THREE.CylinderGeometry(2.4, 2.6, 0.2, 32);
+    const baseMesh = new THREE.Mesh(baseGeo, baseMat);
     baseMesh.position.y = -1.2;
     venueGroup.add(baseMesh);
 
-    const ringMesh = new THREE.Mesh(new THREE.TorusGeometry(2.4, 0.05, 16, 64), goldTrimMat);
+    const ringGeo = new THREE.TorusGeometry(2.4, 0.05, 16, 64);
+    const ringMesh = new THREE.Mesh(ringGeo, goldTrimMat);
     ringMesh.rotation.x = Math.PI / 2;
     ringMesh.position.y = -1.1;
     venueGroup.add(ringMesh);
@@ -56,9 +97,10 @@ export const Location3DCanvas: React.FC = () => {
     // 6 Pillars of the Pavilion
     const pillarCount = 6;
     const pillarRadius = 1.6;
+    const colGeo = new THREE.CylinderGeometry(0.08, 0.09, 1.6, 16);
     for (let i = 0; i < pillarCount; i++) {
       const angle = (i / pillarCount) * Math.PI * 2;
-      const col = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.09, 1.6, 16), goldTrimMat);
+      const col = new THREE.Mesh(colGeo, goldTrimMat);
       col.position.set(Math.cos(angle) * pillarRadius, -0.3, Math.sin(angle) * pillarRadius);
       venueGroup.add(col);
     }
@@ -70,7 +112,8 @@ export const Location3DCanvas: React.FC = () => {
       roughness: 0.3,
       wireframe: true,
     });
-    const dome = new THREE.Mesh(new THREE.SphereGeometry(1.7, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.45), domeMat);
+    const domeGeo = new THREE.SphereGeometry(1.7, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.45);
+    const dome = new THREE.Mesh(domeGeo, domeMat);
     dome.position.y = 0.5;
     venueGroup.add(dome);
 
@@ -86,18 +129,21 @@ export const Location3DCanvas: React.FC = () => {
       roughness: 0.2,
     });
 
-    const pinHead = new THREE.Mesh(new THREE.SphereGeometry(0.35, 32, 32), pinMat);
+    const pinHeadGeo = new THREE.SphereGeometry(0.35, 32, 32);
+    const pinHead = new THREE.Mesh(pinHeadGeo, pinMat);
     pinHead.position.y = 0.4;
     pinGroup.add(pinHead);
 
-    const pinPoint = new THREE.Mesh(new THREE.ConeGeometry(0.35, 0.7, 32), pinMat);
+    const pinPointGeo = new THREE.ConeGeometry(0.35, 0.7, 32);
+    const pinPoint = new THREE.Mesh(pinPointGeo, pinMat);
     pinPoint.rotation.x = Math.PI;
     pinPoint.position.y = 0.05;
     pinGroup.add(pinPoint);
 
     // Inner White Dot on Pin
     const dotMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-    const dot = new THREE.Mesh(new THREE.SphereGeometry(0.12, 16, 16), dotMat);
+    const dotGeo = new THREE.SphereGeometry(0.12, 16, 16);
+    const dot = new THREE.Mesh(dotGeo, dotMat);
     dot.position.set(0, 0.4, 0.25);
     pinGroup.add(dot);
 
@@ -108,7 +154,8 @@ export const Location3DCanvas: React.FC = () => {
       opacity: 0.6,
       side: THREE.DoubleSide,
     });
-    const pulseRing = new THREE.Mesh(new THREE.RingGeometry(0.2, 0.25, 32), pulseMat);
+    const pulseRingGeo = new THREE.RingGeometry(0.2, 0.25, 32);
+    const pulseRing = new THREE.Mesh(pulseRingGeo, pulseMat);
     pulseRing.rotation.x = Math.PI / 2;
     pulseRing.position.y = -1.05;
     venueGroup.add(pulseRing);
@@ -152,7 +199,7 @@ export const Location3DCanvas: React.FC = () => {
     const resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
         const { width: newW, height: newH } = entry.contentRect;
-        if (newW > 0 && newH > 0) {
+        if (newW > 0 && newH > 0 && renderer) {
           camera.aspect = newW / newH;
           camera.updateProjectionMatrix();
           renderer.setSize(newW, newH);
@@ -161,21 +208,14 @@ export const Location3DCanvas: React.FC = () => {
     });
     resizeObserver.observe(container);
 
-    let isVisible = true;
-    const intersectionObserver = new IntersectionObserver(
-      ([entry]) => {
-        isVisible = entry ? entry.isIntersecting : true;
-      },
-      { threshold: 0.05 }
-    );
-    intersectionObserver.observe(container);
-
     let animId: number;
-    let clock = new THREE.Clock();
+    const clock = new THREE.Clock();
 
     const animate = () => {
+      if (isDisposed) return;
       animId = requestAnimationFrame(animate);
-      if (!isVisible) return;
+
+      if (isContextLost || !renderer) return;
       const elapsed = clock.getElapsedTime();
 
       if (!isDragging) {
@@ -183,10 +223,8 @@ export const Location3DCanvas: React.FC = () => {
       }
       venueGroup.rotation.y += (targetRotY - venueGroup.rotation.y) * 0.08;
 
-      // Floating pin bobbing
       pinGroup.position.y = Math.sin(elapsed * 2) * 0.15;
 
-      // Pulse ring scaling
       const pulseScale = (elapsed % 1.5) / 1.5;
       pulseRing.scale.set(1 + pulseScale * 4, 1 + pulseScale * 4, 1);
       pulseMat.opacity = Math.max(0, 0.8 * (1 - pulseScale));
@@ -197,25 +235,49 @@ export const Location3DCanvas: React.FC = () => {
     animate();
 
     return () => {
+      isDisposed = true;
       cancelAnimationFrame(animId);
       resizeObserver.disconnect();
-      intersectionObserver.disconnect();
+
       container.removeEventListener('mousedown', onPointerDown);
       window.removeEventListener('mousemove', onPointerMove);
       window.removeEventListener('mouseup', onPointerUp);
       container.removeEventListener('touchstart', onPointerDown);
       window.removeEventListener('touchmove', onPointerMove);
       window.removeEventListener('touchend', onPointerUp);
-      if (renderer.domElement && container.contains(renderer.domElement)) {
-        container.removeChild(renderer.domElement);
+
+      canvas.removeEventListener('webglcontextlost', onContextLost);
+      canvas.removeEventListener('webglcontextrestored', onContextRestored);
+
+      if (renderer) {
+        if (renderer.domElement && container.contains(renderer.domElement)) {
+          container.removeChild(renderer.domElement);
+        }
+        renderer.dispose();
+        renderer.forceContextLoss();
+        renderer = null;
       }
-      renderer.dispose();
+
+      baseGeo.dispose();
+      baseMat.dispose();
+      goldTrimMat.dispose();
+      ringGeo.dispose();
+      colGeo.dispose();
+      domeGeo.dispose();
+      domeMat.dispose();
+      pinHeadGeo.dispose();
+      pinPointGeo.dispose();
+      pinMat.dispose();
+      dotGeo.dispose();
+      dotMat.dispose();
+      pulseRingGeo.dispose();
+      pulseMat.dispose();
     };
-  }, []);
+  }, [isInView]);
 
   return (
-    <div className="relative w-full h-[240px] sm:h-[280px] flex items-center justify-center cursor-grab active:cursor-grabbing select-none">
-      <div ref={mountRef} className="w-full h-full" />
+    <div className="relative w-full h-[240px] sm:h-[280px] flex items-center justify-center cursor-grab active:cursor-grabbing select-none bg-transparent">
+      <div ref={mountRef} className="w-full h-full bg-transparent overflow-hidden" />
     </div>
   );
 };

@@ -263,7 +263,7 @@ export default function App() {
           <GiftSection bankAccounts={config?.bank_accounts || []} config={config} />
 
           {/* Closing Footer */}
-          <Footer config={config} />
+          <Footer config={config} onOpenAdmin={() => setIsAdminRoute(true)} />
 
           {/* 3D Floating Gem Scroll-To-Top Button */}
           <ScrollToTop3D />

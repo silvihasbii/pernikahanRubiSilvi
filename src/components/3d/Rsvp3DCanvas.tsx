@@ -1,13 +1,30 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 
 export const Rsvp3DCanvas: React.FC = () => {
   const mountRef = useRef<HTMLDivElement>(null);
+  const [isInView, setIsInView] = useState(false);
 
   useEffect(() => {
     const container = mountRef.current;
     if (!container) return;
 
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsInView(entry.isIntersecting);
+      },
+      { rootMargin: '200px 0px', threshold: 0.01 }
+    );
+
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const container = mountRef.current;
+    if (!container || !isInView) return;
+
+    let isDisposed = false;
     let width = container.clientWidth || 300;
     let height = container.clientHeight || 240;
 
@@ -15,48 +32,59 @@ export const Rsvp3DCanvas: React.FC = () => {
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
     camera.position.set(0, 0, 6.2);
 
-    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, powerPreference: 'high-performance' });
-    renderer.setClearColor(0x000000, 0);
-    renderer.setSize(width, height);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.domElement.style.background = 'transparent';
-    renderer.domElement.style.display = 'block';
+    let renderer: THREE.WebGLRenderer | null = null;
+    try {
+      renderer = new THREE.WebGLRenderer({
+        alpha: true,
+        antialias: true,
+        powerPreference: 'high-performance',
+      });
+      renderer.setClearColor(0x000000, 0);
+      renderer.setSize(width, height);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.domElement.style.background = 'transparent';
+      renderer.domElement.style.backgroundColor = 'transparent';
+      renderer.domElement.style.display = 'block';
 
-    const onContextLost = (e: Event) => e.preventDefault();
-    renderer.domElement.addEventListener('webglcontextlost', onContextLost, false);
+      container.innerHTML = '';
+      container.appendChild(renderer.domElement);
+    } catch {
+      return;
+    }
 
-    container.innerHTML = '';
-    container.appendChild(renderer.domElement);
+    let isContextLost = false;
+    const onContextLost = (e: Event) => {
+      e.preventDefault();
+      isContextLost = true;
+      if (renderer?.domElement) renderer.domElement.style.opacity = '0';
+    };
+    const onContextRestored = () => {
+      isContextLost = false;
+      if (renderer?.domElement) renderer.domElement.style.opacity = '1';
+    };
+
+    const canvas = renderer.domElement;
+    canvas.addEventListener('webglcontextlost', onContextLost, false);
+    canvas.addEventListener('webglcontextrestored', onContextRestored, false);
 
     const rsvpGroup = new THREE.Group();
     scene.add(rsvpGroup);
 
-    // 3D Envelope Body
     const envelopeMat = new THREE.MeshStandardMaterial({
       color: 0x22222c,
       roughness: 0.3,
       metalness: 0.6,
     });
-    const goldTrimMat = new THREE.MeshStandardMaterial({
-      color: 0xd4af37,
-      metalness: 0.9,
-      roughness: 0.2,
-      emissive: 0x3d2800,
-      emissiveIntensity: 0.2,
-    });
-
     const bodyGeo = new THREE.BoxGeometry(2.4, 1.6, 0.15);
     const bodyMesh = new THREE.Mesh(bodyGeo, envelopeMat);
     rsvpGroup.add(bodyMesh);
 
-    // Gold borders around envelope
     const borderEdges = new THREE.LineSegments(
       new THREE.EdgesGeometry(bodyGeo),
       new THREE.LineBasicMaterial({ color: 0xd4af37, linewidth: 2 })
     );
     rsvpGroup.add(borderEdges);
 
-    // Envelope Flap
     const flapShape = new THREE.Shape();
     flapShape.moveTo(-1.2, 0.8);
     flapShape.lineTo(1.2, 0.8);
@@ -68,23 +96,23 @@ export const Rsvp3DCanvas: React.FC = () => {
     flapMesh.position.z = 0.08;
     rsvpGroup.add(flapMesh);
 
-    // Wax Seal Stamp (Ruby Red with Gold Heart)
     const sealMat = new THREE.MeshStandardMaterial({
       color: 0x991122,
       roughness: 0.4,
       metalness: 0.3,
     });
-    const seal = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.08, 32), sealMat);
+    const sealGeo = new THREE.CylinderGeometry(0.3, 0.3, 0.08, 32);
+    const seal = new THREE.Mesh(sealGeo, sealMat);
     seal.rotation.x = Math.PI / 2;
     seal.position.set(0, -0.2, 0.12);
     rsvpGroup.add(seal);
 
     const heartMat = new THREE.MeshBasicMaterial({ color: 0xf3e5ab });
-    const heart = new THREE.Mesh(new THREE.OctahedronGeometry(0.12, 0), heartMat);
+    const heartGeo = new THREE.OctahedronGeometry(0.12, 0);
+    const heart = new THREE.Mesh(heartGeo, heartMat);
     heart.position.set(0, -0.2, 0.17);
     rsvpGroup.add(heart);
 
-    // Floating Wishing Lanterns in Background
     const lanternMat = new THREE.MeshStandardMaterial({
       color: 0xffd97d,
       emissive: 0xffa200,
@@ -93,9 +121,10 @@ export const Rsvp3DCanvas: React.FC = () => {
       opacity: 0.85,
     });
 
+    const lanternGeo = new THREE.CylinderGeometry(0.2, 0.25, 0.4, 8);
     const lanterns: { mesh: THREE.Mesh; x: number; baseY: number; speed: number; phase: number }[] = [];
     for (let i = 0; i < 4; i++) {
-      const lantern = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.25, 0.4, 8), lanternMat);
+      const lantern = new THREE.Mesh(lanternGeo, lanternMat);
       const x = (i - 1.5) * 1.5;
       const baseY = -1.2 + Math.random() * 0.8;
       lantern.position.set(x, baseY, -1.5);
@@ -109,7 +138,6 @@ export const Rsvp3DCanvas: React.FC = () => {
       });
     }
 
-    // Lights
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.9);
     scene.add(ambientLight);
 
@@ -117,7 +145,6 @@ export const Rsvp3DCanvas: React.FC = () => {
     pointLight.position.set(2, 3, 4);
     scene.add(pointLight);
 
-    // Interactive Drag
     let isDragging = false;
     let prevX = 0;
     let prevY = 0;
@@ -154,7 +181,7 @@ export const Rsvp3DCanvas: React.FC = () => {
     const resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
         const { width: newW, height: newH } = entry.contentRect;
-        if (newW > 0 && newH > 0) {
+        if (newW > 0 && newH > 0 && renderer) {
           camera.aspect = newW / newH;
           camera.updateProjectionMatrix();
           renderer.setSize(newW, newH);
@@ -163,21 +190,14 @@ export const Rsvp3DCanvas: React.FC = () => {
     });
     resizeObserver.observe(container);
 
-    let isVisible = true;
-    const intersectionObserver = new IntersectionObserver(
-      ([entry]) => {
-        isVisible = entry ? entry.isIntersecting : true;
-      },
-      { threshold: 0.05 }
-    );
-    intersectionObserver.observe(container);
-
     let animId: number;
-    let clock = new THREE.Clock();
+    const clock = new THREE.Clock();
 
     const animate = () => {
+      if (isDisposed) return;
       animId = requestAnimationFrame(animate);
-      if (!isVisible) return;
+
+      if (isContextLost || !renderer) return;
       const elapsed = clock.getElapsedTime();
 
       if (!isDragging) {
@@ -188,7 +208,6 @@ export const Rsvp3DCanvas: React.FC = () => {
       rsvpGroup.rotation.x += (targetRotX - rsvpGroup.rotation.x) * 0.08;
       rsvpGroup.position.y = Math.sin(elapsed * 1.5) * 0.1;
 
-      // Float lanterns upward slowly and loop
       for (const l of lanterns) {
         l.mesh.position.y = l.baseY + Math.sin(elapsed * l.speed + l.phase) * 0.3;
         l.mesh.rotation.y = elapsed * 0.5;
@@ -200,25 +219,44 @@ export const Rsvp3DCanvas: React.FC = () => {
     animate();
 
     return () => {
+      isDisposed = true;
       cancelAnimationFrame(animId);
       resizeObserver.disconnect();
-      intersectionObserver.disconnect();
+
       container.removeEventListener('mousedown', onPointerDown);
       window.removeEventListener('mousemove', onPointerMove);
       window.removeEventListener('mouseup', onPointerUp);
       container.removeEventListener('touchstart', onPointerDown);
       window.removeEventListener('touchmove', onPointerMove);
       window.removeEventListener('touchend', onPointerUp);
-      if (renderer.domElement && container.contains(renderer.domElement)) {
-        container.removeChild(renderer.domElement);
+
+      canvas.removeEventListener('webglcontextlost', onContextLost);
+      canvas.removeEventListener('webglcontextrestored', onContextRestored);
+
+      if (renderer) {
+        if (renderer.domElement && container.contains(renderer.domElement)) {
+          container.removeChild(renderer.domElement);
+        }
+        renderer.dispose();
+        renderer.forceContextLoss();
+        renderer = null;
       }
-      renderer.dispose();
+
+      bodyGeo.dispose();
+      envelopeMat.dispose();
+      flapGeo.dispose();
+      sealGeo.dispose();
+      sealMat.dispose();
+      heartGeo.dispose();
+      heartMat.dispose();
+      lanternGeo.dispose();
+      lanternMat.dispose();
     };
-  }, []);
+  }, [isInView]);
 
   return (
-    <div className="relative w-full h-[220px] sm:h-[260px] flex items-center justify-center cursor-grab active:cursor-grabbing select-none">
-      <div ref={mountRef} className="w-full h-full" />
+    <div className="relative w-full h-[220px] sm:h-[260px] flex items-center justify-center cursor-grab active:cursor-grabbing select-none bg-transparent">
+      <div ref={mountRef} className="w-full h-full bg-transparent overflow-hidden" />
     </div>
   );
 };
