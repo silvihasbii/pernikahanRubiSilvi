@@ -250,6 +250,31 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
   };
 
+  const handleExportCsv = () => {
+    if (rsvps.length === 0) {
+      alert('Belum ada data konfirmasi tamu untuk diekspor.');
+      return;
+    }
+    const headers = ['ID', 'Nama Tamu', 'Jumlah Tamu', 'Status Kehadiran', 'Pesan Doa Restu', 'Waktu Masuk'];
+    const rows = rsvps.map((r) => [
+      `"${r.id}"`,
+      `"${(r.name || '').replace(/"/g, '""')}"`,
+      r.guests_count,
+      `"${r.attendance}"`,
+      `"${(r.message || '').replace(/"/g, '""')}"`,
+      `"${r.created_at}"`,
+    ]);
+    const csvString = '\uFEFF' + [headers.join(','), ...rows.map((row) => row.join(','))].join('\n');
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `rekap-rsvp-tamu-${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   if (checkingAuth) {
     return (
       <div className="min-h-screen bg-[#090a0f] flex items-center justify-center p-6 text-amber-200">
@@ -465,14 +490,13 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 <p className="text-xs text-zinc-400">Unduh data daftar tamu atau muat ulang data database terbaru</p>
               </div>
               <div className="flex gap-3">
-                <a
-                  href="/api/admin/rsvp/export"
-                  download
-                  className="px-4 py-2 rounded-xl bg-amber-400 text-black font-semibold text-xs flex items-center gap-2 hover:bg-amber-300 transition-colors"
+                <button
+                  onClick={handleExportCsv}
+                  className="px-4 py-2 rounded-xl bg-amber-400 text-black font-semibold text-xs flex items-center gap-2 hover:bg-amber-300 transition-colors cursor-pointer"
                 >
                   <Download className="w-4 h-4" />
                   <span>Unduh Rekap CSV</span>
-                </a>
+                </button>
                 <button
                   onClick={loadAdminData}
                   className="px-4 py-2 rounded-xl bg-zinc-800 text-zinc-200 text-xs flex items-center gap-2 hover:bg-zinc-700 transition-colors cursor-pointer"
@@ -652,14 +676,13 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                   Data konfirmasi kehadiran yang terkirim dari seluruh tamu undangan
                 </p>
               </div>
-              <a
-                href="/api/admin/rsvp/export"
-                download
+              <button
+                onClick={handleExportCsv}
                 className="px-4 py-2 rounded-xl bg-amber-400 text-black font-semibold text-xs flex items-center gap-2 hover:bg-amber-300 transition-colors cursor-pointer"
               >
                 <Download className="w-4 h-4" />
                 <span>Unduh CSV Lengkap</span>
-              </a>
+              </button>
             </div>
 
             <div className="overflow-x-auto">

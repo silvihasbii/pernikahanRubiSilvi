@@ -43,6 +43,7 @@ export interface RsvpStats {
   totalResponses: number;
   totalAttending: number;
   totalNotAttending: number;
+  totalGuestsAttending?: number;
 }
 
 export interface WishItem {
