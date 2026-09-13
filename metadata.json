@@ -1,0 +1,6 @@
+{
+  "name": "Undangan Pernikahan 3D Interaktif",
+  "description": "Aplikasi undangan pernikahan digital fullstack modern dengan animasi full 3D interaktif, decoupled backend, sistem RSVP & live chat real-time, dan portal admin aman.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
